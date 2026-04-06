@@ -41,6 +41,17 @@
 
 完成首次 **Deploy** 后，使用 Vercel 提供的域名访问；根路径 `/` 会重定向到 **`/ecosystem`** 生态总览页。
 
+**若浏览器出现 `404: NOT_FOUND`（页面里带 `Code: NOT_FOUND` 与 `sfo1::…` 这类 ID）：**
+
+这通常是 **Vercel 没把你的站点当成 Next 应用跑起来**（边缘层找不到应用），而不是「少写了一页」。
+
+请按顺序自查：
+
+1. **Settings → General → Root Directory** 必须是 **`apps/admin-web`**（不要留空、不要只填仓库根）。改完后 **Redeploy**。  
+2. **Settings → General → Framework Preset** 应为 **Next.js**；**Output Directory** 必须 **留空**（不要填 `dist` / `.next`）。  
+3. 在部署的域名后 **手动访问** `https://你的域名/ecosystem` 试一次。若 **`/ecosystem` 也 NOT_FOUND**，几乎可以断定仍是 Root Directory / 构建类型问题。  
+4. 打开该次部署的 **Build Logs**，确认出现 **Next.js** 构建与 `Route (app)` 汇总，而不是「空目录」或其它框架。
+
 ---
 
 ## 二、CLI 部署（可选）
