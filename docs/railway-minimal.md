@@ -4,6 +4,18 @@
 
 ---
 
+## 先读这一段：你现在的错误是不是这一类？
+
+| 现象 | 含义 |
+|------|------|
+| **`Error creating build plan with Railpack`** | 构建计划阶段就失败：**还没启动容器、还没读环境变量、还没跑到 `/health`**。 |
+| 部署记录里是 **`docs:` / `feat:`** 等 commit | 只说明 **GitHub 联动正常**、按最新提交触发了构建，**不表示**构建上下文已经进了 `apps/…`。 |
+| Service 名字等于 **仓库名**（如 `ai-employee-v1`） | 常见于「从 GitHub 一键加一个服务」的默认命名；**本身不犯法**，但若 **Root Directory 仍为空（仓库根）**，就会和 monorepo 根目录结构冲突，Railpack 仍不知道 build 谁。 |
+
+**结论：** 先修 **Service → Settings → Source → Root Directory**，再谈变量与 Telegram。需要 **两个 Service**，分别指向 **`apps/orchestrator-service`** 与 **`apps/bot-service`**（可在 Railway 里把服务重命名成 `orchestrator` / `bot` 便于辨认）。
+
+---
+
 ## 前置假设
 
 - 代码已在 GitHub，Railway 从仓库部署。
