@@ -146,7 +146,7 @@ npm install
 npm run dev
 ```
 
-浏览器打开 `http://localhost:3000`（默认重定向至 **`/ecosystem` 生态总览**）。顶栏展示前端公开环境变量是否已配置（不展示密钥内容）。详细联调见 [`../../docs/local-testing.md`](../../docs/local-testing.md)。
+浏览器打开 **`http://localhost:3000/`**（不要访问 `/index`）：根路径会先出现简短确认页，再在客户端进入 **`/ecosystem`** 生态总览。顶栏展示前端公开环境变量是否已配置（不展示密钥内容）。详细联调见 [`../../docs/local-testing.md`](../../docs/local-testing.md)。
 
 ## Vercel 生产部署
 

@@ -74,7 +74,7 @@ npm install
 npm run dev
 ```
 
-浏览器打开终端里提示的地址（一般为 `http://localhost:3000`）。
+浏览器打开终端里提示的地址（一般为 **`http://localhost:3000/`**）。App Router 首页是 **`/`**，不要手动访问 **`/index`**。
 
 ### 3. 验证读到了变量
 

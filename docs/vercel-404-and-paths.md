@@ -24,7 +24,7 @@
 
 | 仓库路径（简写） | 浏览器路径 ③ |
 |------------------|--------------|
-| `app/page.js` | `/`（并会跳到 `/ecosystem`，见 `middleware` / `next.config`） |
+| `app/page.js` | `/`（返回 200 + 可见文案，再在浏览器内 `replace` 到 `/ecosystem`） |
 | `app/ecosystem/page.js` | `/ecosystem` |
 
 没有 `app/foo/page.js` 就没有 `/foo`——这是 **③ 层面** 的 404。
@@ -59,7 +59,7 @@
 - `https://<你的域名>/ecosystem`
 
 若 **② 已正确**、构建成功，这里应能打开生态总览。  
-若只有 `/` 有问题，再看 **Redeploy** 是否已包含最新的 `middleware` / `redirects`（见仓库 `apps/admin-web`）。
+若只有 `/` 有问题，再看 **Redeploy** 是否已拉到最新 `apps/admin-web`（根路径依赖 `app/page.js` + `app/components/HomeGate.js`）。
 
 ### 第四步：仍迷惑时，对照「我到底部署的是哪一层」
 
@@ -85,5 +85,10 @@
 
 - 逐步点按钮部署：[`vercel-admin-web.md`](./vercel-admin-web.md)  
 - 本地怎么跑同一套路由：[`local-testing.md`](./local-testing.md)
+
+### 浏览器 Console 里的 `(index):1` 和 `/favicon.ico`
+
+- **`(index):1` 404**：多数情况下表示**当前打开的这份 HTML 文档**（首页）整体返回了 404；Chrome 在 Console 里会标成 `(index)`。**不等于**你访问了路径 **`/index`**。App Router 的首页永远是 **`/`**，不要手动打开 `http://localhost:3000/index`。
+- **`/favicon.ico` 404**：只是缺图标时的附带噪音；仓库已在 `app/icon.svg` 提供图标以减轻干扰。**主链是否 404 要以文档请求是否 200 为准**，不要先看 favicon。
 
 当前阶段口径：**先保证 ② 正确，再谈 ③ 扩展新页面。**

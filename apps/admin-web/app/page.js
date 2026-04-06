@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import HomeGate from "./components/HomeGate";
 
 export default function Home() {
-  redirect("/ecosystem");
+  return <HomeGate />;
 }
