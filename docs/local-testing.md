@@ -1,5 +1,24 @@
 # 本地分层测试（Cursor / 终端）
 
+> **回归对象**：既是代码，也是本 runbook。换机器 / 改代码后，建议按「零、回归清单」从头到尾跑一遍。  
+> **线上最小验证**：部署与公网 health 见 [`railway-minimal.md`](./railway-minimal.md)。
+
+---
+
+## 零、回归清单（建议照抄执行）
+
+1. [ ] `cd apps/orchestrator-service && npm install && npm run dev`（终端 A）
+2. [ ] `cd apps/bot-service && npm install && npm run dev`（终端 B）
+3. [ ] `curl -s http://localhost:8001/health` → `orchestrator-service`
+4. [ ] `curl -s http://localhost:8010/health` → `bot-service`
+5. [ ] `curl` **ingest**（见下文「二、4」）→ 配置齐全时应含 `reply_text` + Supabase 落账；**未配 Supabase 时应为 503**（见「未配置完整 .env 时的预期」）
+6. [ ] `curl` **webhook**（见「三、3」）→ 配置齐全时应 200 且含 `orchestrator.reply_text`
+7. [ ] `cd apps/admin-web && cp .env.example .env.local`（填入真实或冒烟用 `NEXT_PUBLIC_*`）→ `npm install && npm run dev` → 浏览器 Console 确认变量非 `undefined`
+
+若 **orchestrator 启动报错**（如依赖解析失败），在本目录执行：`rm -rf node_modules && npm install` 后重试。若 **8001 返回异常旧行为**，检查是否有遗留进程占用端口（可用 `lsof -i :8001`）。
+
+---
+
 目标不是「变量在不在控制台里」，而是验证三层：
 
 1. **本地代码能读到环境变量**（且不泄露密钥）
@@ -19,6 +38,15 @@
 | `apps/orchestrator-service` | `.env` |
 
 根目录 `.env` 容易与 app 内 `.env` 混淆；当前 **dotenv 只加载各 app 自己目录下的 `.env`**，请以对应 app 目录为准。
+
+### 未配置完整后端 `.env` 时的预期（仍算「runbook 跑通」）
+
+未在 `apps/orchestrator-service/.env` 中配置 **Supabase**（或 Key 无效）时：
+
+- **ingest** `POST /internal/ingest/telegram` → **HTTP 503**，body 提示 `Supabase not configured ...`
+- **bot** `POST /telegram/webhook` → 转发 orchestrator 后同样可能为 **HTTP 503**，body 含 `orchestrator_base_url`
+
+此时 **health** 仍应为 **200**。这用于确认「进程与路由正常」，与「账本 + 模型已配对」是两步；配对完成后应再跑一遍清单第 5–6 步，直到 **200** 且 Supabase 有账。
 
 ---
 
@@ -105,6 +133,8 @@ curl -s -X POST http://localhost:8001/internal/ingest/telegram \
 - Supabase **`jobs`** 有一条从 `pending` 到终态的记录
 - **`messages`** 有一条对应记录
 
+若当前未配置 Supabase，此处应以 **HTTP 503** 为预期（见上文「未配置完整后端 `.env`」）。
+
 ---
 
 ## 三、bot-service
@@ -140,6 +170,23 @@ curl -s http://localhost:8010/health
 （若本机 `8010` 被占用，可在 `.env` 里改 `BOT_SERVICE_PORT`。）
 
 ### 3. 模拟 Webhook
+
+**未配置 `TELEGRAM_WEBHOOK_SECRET` 时**（不要带 secret 头）：
+
+```bash
+curl -s -X POST http://localhost:8010/telegram/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": {
+      "message_id": 1,
+      "text": "测试bot转发",
+      "chat": { "id": 123456 },
+      "from": { "id": 999999, "is_bot": false, "first_name": "test" }
+    }
+  }'
+```
+
+**已配置 `TELEGRAM_WEBHOOK_SECRET` 时**（必须带头，值与 `.env` 一致）：
 
 ```bash
 curl -s -X POST http://localhost:8010/telegram/webhook \

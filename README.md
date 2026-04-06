@@ -242,6 +242,7 @@ curl http://localhost:8001/health
 - [`docs/supabase-schema-v1.sql`](docs/supabase-schema-v1.sql) — Supabase Schema
 - [`docs/progress.md`](docs/progress.md) — 当前进度快照
 - [`docs/local-testing.md`](docs/local-testing.md) — 本地分层测试（health / ingest / webhook）
+- [`docs/railway-minimal.md`](docs/railway-minimal.md) — Railway 双服务最小上线与公网验证
 
 ## 工程原则
 
