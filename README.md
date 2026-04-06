@@ -243,6 +243,7 @@ curl http://localhost:8001/health
 - [`docs/progress.md`](docs/progress.md) — 当前进度快照
 - [`docs/local-testing.md`](docs/local-testing.md) — 本地分层测试（health / ingest / webhook）
 - [`docs/railway-minimal.md`](docs/railway-minimal.md) — Railway 双服务最小上线与公网验证
+- [`docs/vercel-admin-web.md`](docs/vercel-admin-web.md) — Vercel 部署 `admin-web`（Root Directory、环境变量）
 
 ## 工程原则
 

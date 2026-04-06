@@ -146,7 +146,11 @@ npm install
 npm run dev
 ```
 
-浏览器打开 `http://localhost:3000`，在开发者工具 **Console** 中确认 `NEXT_PUBLIC_*` 已加载（详见 [`../../docs/local-testing.md`](../../docs/local-testing.md)）。
+浏览器打开 `http://localhost:3000`（默认重定向至 **`/ecosystem` 生态总览**）。顶栏展示前端公开环境变量是否已配置（不展示密钥内容）。详细联调见 [`../../docs/local-testing.md`](../../docs/local-testing.md)。
+
+## Vercel 生产部署
+
+在 Vercel 导入本仓库时，**Root Directory 必须设为 `apps/admin-web`**，并配置三个 `NEXT_PUBLIC_*` 变量。逐步说明见 [`../../docs/vercel-admin-web.md`](../../docs/vercel-admin-web.md)。
 
 ## 工程原则
 
