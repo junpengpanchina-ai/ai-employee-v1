@@ -11,6 +11,26 @@
 
 ---
 
+## 故障速查：Railpack / `start.sh not found` / `could not determine how to build`
+
+若构建日志里 **根目录列出的是** `apps/`、`docs/`、`packages/`、`.env.example`（整仓根），并出现：
+
+- `Script start.sh not found`
+- `Railpack could not determine how to build the app`
+
+**原因**：该 Service 的 **Root Directory 仍指向仓库根**。根目录没有 Node 的 `package.json`，Railpack 无法识别为 Node 应用。
+
+**处理**（每个 Service 各做一次）：
+
+1. 打开 Railway → 选中 **对应 Service**（不是整个 Project 的泛泛设置）。  
+2. **Settings** → **Source**（或 **Build**）→ **Root Directory**。  
+3. 填 **`apps/orchestrator-service`** 或 **`apps/bot-service`**（与这个 Service 的职责一致）。  
+4. **保存** 后触发 **Redeploy**。
+
+**通过后**的日志里，构建上下文应直接出现 `package.json`、`src/` 等，而**不是**只在根下看到一个 `apps` 文件夹。
+
+---
+
 ## 1. Service A：`orchestrator-service`
 
 | 设置项 | 建议值 |

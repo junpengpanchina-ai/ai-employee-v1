@@ -41,6 +41,8 @@ Telegram ──► Railway bot-service ──► Railway orchestrator-service
 
 ## 2. Railway：`orchestrator-service`（第二个接）
 
+> **若构建报 Railpack / `start.sh not found`、且日志里根目录有 `apps/`、`docs/`：** 说明 Root Directory 还在**仓库根**，必须改成下面这一层，见 [`railway-minimal.md`](./railway-minimal.md) 故障速查。
+
 1. **New Project → Deploy from GitHub**，选本仓库。  
 2. **Add Service**（或第一个服务）→ 配置：  
    - **Root Directory**：`apps/orchestrator-service`  
