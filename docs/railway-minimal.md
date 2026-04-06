@@ -24,6 +24,8 @@
 | 变量 | 说明 |
 |------|------|
 | `PORT` | **通常由 Railway 自动注入**，无需手写；代码已 **优先读 `PORT`**。 |
+| `HOST` | 可选；默认 **`0.0.0.0`**，保证容器外可访问。 |
+| `CORS_ORIGIN` | 可选；Vercel 管理后台源（如 `https://xxx.vercel.app`），多个逗号分隔。 |
 | `SUPABASE_URL` | Supabase 项目 URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | **仅本服务**，勿放到 bot 若 bot 不需要写库 |
 | `GRSAI_API_KEY` | GRSAI |

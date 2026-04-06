@@ -136,13 +136,16 @@ curl http://localhost:8001/health
 |--------|------|
 | `APP_ENV` | 运行环境 |
 | `LOG_LEVEL` | 日志级别 |
-| `ORCHESTRATOR_PORT` | 服务端口，默认建议 `8001` |
+| `PORT` | 部署环境（如 Railway）注入端口，优先于 `ORCHESTRATOR_PORT` |
+| `HOST` | 监听地址，默认 `0.0.0.0`（容器必达） |
+| `ORCHESTRATOR_PORT` | 本地默认 `8001` |
 | `BOT_MODEL` | 默认模型名，如 `gemini-3.1-pro` |
 | `GRSAI_API_KEY` | GRSAI API Key |
 | `GRSAI_BASE_URL` | GRSAI 基础地址 |
 | `GRSAI_COMPLETIONS_PATH` | OpenAI 兼容 completions 路径 |
 | `SUPABASE_URL` | Supabase 项目地址 |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase 服务端高权限 Key |
+| `CORS_ORIGIN` | 可选；Vercel 前端源（无尾斜杠），多个逗号分隔，供浏览器调 `GET /health` 等 |
 
 ## Supabase 当前落账范围
 

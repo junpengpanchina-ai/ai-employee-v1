@@ -91,7 +91,9 @@ Telegram Webhook 入口。
 |--------|------|
 | `APP_ENV` | 运行环境，如 `local` / `development` / `production` |
 | `LOG_LEVEL` | 日志级别，如 `info` / `debug` |
-| `BOT_SERVICE_PORT` | 服务端口，默认建议 `8010` |
+| `PORT` | Railway 等注入端口，优先于 `BOT_SERVICE_PORT` |
+| `HOST` | 监听地址，默认 `0.0.0.0` |
+| `BOT_SERVICE_PORT` | 本地默认建议 `8010` |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot Token |
 | `TELEGRAM_WEBHOOK_SECRET` | Telegram Webhook Secret，可选但建议配置 |
 | `ORCHESTRATOR_BASE_URL` | orchestrator 服务地址 |

@@ -1,6 +1,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import { callGRSAI } from "./grsai.js";
+import { corsMiddleware } from "./cors.js";
 import {
   getSupabase,
   saveJobPending,
@@ -11,6 +12,7 @@ import {
 dotenv.config();
 
 const app = express();
+app.use(corsMiddleware);
 app.use(express.json());
 
 const PORT = Number(process.env.PORT || process.env.ORCHESTRATOR_PORT || 8001);
@@ -162,12 +164,17 @@ function logStartupEnv() {
     SUPABASE_SERVICE_ROLE_KEY_set: Boolean(
       process.env.SUPABASE_SERVICE_ROLE_KEY
     ),
-    BOT_MODEL: process.env.BOT_MODEL || "(code default)"
+    BOT_MODEL: process.env.BOT_MODEL || "(code default)",
+    CORS_ORIGIN_set: Boolean((process.env.CORS_ORIGIN || "").trim())
   });
 }
 
 logStartupEnv();
 
-app.listen(PORT, () => {
-  console.log(`[orchestrator-service] listening on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(
+    `[orchestrator-service] listening on http://${HOST}:${PORT}`
+  );
 });

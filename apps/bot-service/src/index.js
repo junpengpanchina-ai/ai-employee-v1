@@ -144,6 +144,8 @@ function logStartupEnv() {
 
 logStartupEnv();
 
-app.listen(PORT, () => {
-  console.log(`[bot-service] listening on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+
+app.listen(PORT, HOST, () => {
+  console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
 });

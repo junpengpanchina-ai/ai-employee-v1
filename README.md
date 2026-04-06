@@ -245,6 +245,7 @@ curl http://localhost:8001/health
 - [`docs/railway-minimal.md`](docs/railway-minimal.md) — Railway 双服务最小上线与公网验证
 - [`docs/vercel-admin-web.md`](docs/vercel-admin-web.md) — Vercel 部署 `admin-web`（Root Directory、环境变量）
 - [`docs/vercel-404-and-paths.md`](docs/vercel-404-and-paths.md) — 404 时如何区分「仓库路径 / Vercel 根目录 / URL」
+- [`docs/full-stack-integration.md`](docs/full-stack-integration.md) — **全栈接通**：Supabase → Railway（双服务）→ Telegram → Vercel
 
 ## 工程原则
 
