@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit (templates named `.env.example` stay tracked)
+.env
+.env.local
+.env.*.local
+**/.env
+!**/.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs & debug
+logs/
+*.log
+npm-debug.log*
+
+# Build outputs
+dist/
+.next/
+out/
+.turbo/
+.vercel/
