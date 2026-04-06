@@ -241,6 +241,7 @@ curl http://localhost:8001/health
 - [`docs/system-architecture-v1.md`](docs/system-architecture-v1.md) — 组织架构与技术总纲（V1）
 - [`docs/supabase-schema-v1.sql`](docs/supabase-schema-v1.sql) — Supabase Schema
 - [`docs/progress.md`](docs/progress.md) — 当前进度快照
+- [`docs/local-testing.md`](docs/local-testing.md) — 本地分层测试（health / ingest / webhook）
 
 ## 工程原则
 

@@ -13,7 +13,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.ORCHESTRATOR_PORT || 8001;
+const PORT = Number(process.env.PORT || process.env.ORCHESTRATOR_PORT || 8001);
 
 const GRSAI_FAIL_REPLY =
   process.env.GRSAI_FAIL_REPLY || "（模型暂时不可用，请稍后再试。）";
@@ -145,6 +145,28 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     grsai_error: grsaiError || null
   });
 });
+
+function logStartupEnv() {
+  const on =
+    process.env.LOG_LEVEL === "debug" ||
+    process.env.APP_ENV === "local" ||
+    process.env.APP_ENV === "development";
+  if (!on) return;
+  console.log("[orchestrator-service] startup env (no secrets):", {
+    PORT: String(PORT),
+    GRSAI_API_KEY_set: Boolean(process.env.GRSAI_API_KEY),
+    GRSAI_BASE_URL_set: Boolean(process.env.GRSAI_BASE_URL),
+    GRSAI_COMPLETIONS_PATH:
+      process.env.GRSAI_COMPLETIONS_PATH || "(code default)",
+    SUPABASE_URL_set: Boolean(process.env.SUPABASE_URL),
+    SUPABASE_SERVICE_ROLE_KEY_set: Boolean(
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    ),
+    BOT_MODEL: process.env.BOT_MODEL || "(code default)"
+  });
+}
+
+logStartupEnv();
 
 app.listen(PORT, () => {
   console.log(`[orchestrator-service] listening on port ${PORT}`);

@@ -6,7 +6,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
-const PORT = process.env.BOT_SERVICE_PORT || 8010;
+const PORT = Number(process.env.PORT || process.env.BOT_SERVICE_PORT || 8010);
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const ORCHESTRATOR_BASE_URL = (
   process.env.ORCHESTRATOR_BASE_URL || "http://localhost:8001"
@@ -126,6 +126,23 @@ app.post("/telegram/webhook", async (req, res) => {
     });
   }
 });
+
+function logStartupEnv() {
+  const on =
+    process.env.LOG_LEVEL === "debug" ||
+    process.env.APP_ENV === "local" ||
+    process.env.APP_ENV === "development";
+  if (!on) return;
+  console.log("[bot-service] startup env (no secrets):", {
+    PORT: String(PORT),
+    ORCHESTRATOR_BASE_URL,
+    TELEGRAM_BOT_TOKEN_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    TELEGRAM_WEBHOOK_SECRET_set: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
+    TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)"
+  });
+}
+
+logStartupEnv();
 
 app.listen(PORT, () => {
   console.log(`[bot-service] listening on port ${PORT}`);

@@ -136,14 +136,17 @@ cp .env.example .env.local
 
 按本地或部署环境填写，不要提交真实密钥。
 
-## 本地开发（预留）
-
-待项目初始化后可使用类似命令启动：
+## 本地开发
 
 ```bash
+cd apps/admin-web
+cp .env.example .env.local
+# 编辑 .env.local 填入 NEXT_PUBLIC_*
 npm install
 npm run dev
 ```
+
+浏览器打开 `http://localhost:3000`，在开发者工具 **Console** 中确认 `NEXT_PUBLIC_*` 已加载（详见 [`../../docs/local-testing.md`](../../docs/local-testing.md)）。
 
 ## 工程原则
 
