@@ -45,7 +45,7 @@
 
 这通常是 **Vercel 没把你的站点当成 Next 应用跑起来**（边缘层找不到应用），而不是「少写了一页」。
 
-请按顺序自查：
+更系统的「三种目录」对照与排查顺序见 **[`vercel-404-and-paths.md`](./vercel-404-and-paths.md)**。此处保留最短自查：
 
 1. **Settings → General → Root Directory** 必须是 **`apps/admin-web`**（不要留空、不要只填仓库根）。改完后 **Redeploy**。  
 2. **Settings → General → Framework Preset** 应为 **Next.js**；**Output Directory** 必须 **留空**（不要填 `dist` / `.next`）。  
