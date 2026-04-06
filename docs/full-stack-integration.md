@@ -122,6 +122,18 @@ curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 若日后在浏览器里 `fetch(NEXT_PUBLIC_API_BASE_URL + '/health')`，需保证 orchestrator 已配置 **`CORS_ORIGIN`** 包含该 Vercel 源。
 
+### Railway「Integrations → Vercel」里选不到某个 Vercel 项目？
+
+**本架构不依赖该集成。** 前后端靠 **各自平台的环境变量**（`NEXT_PUBLIC_API_BASE_URL`、`CORS_ORIGIN` 等）即可打通，**不必**在 Railway 里绑定 Vercel 项目。
+
+若仍想绑定但下拉里**没有** `ai-employee-v1`，常见原因：
+
+- 下拉关联的 **Vercel 账号 / Team**（如 `junpengpanchina-4765`）与创建 **`ai-employee-v1` 时所在团队**不一致（个人 Hobby vs Team）。  
+- 项目在集成**授权之后**才创建，尝试 **断开 Vercel 集成再重新连接** 或刷新授权范围。  
+- 浏览器缓存：换无痕窗口或稍后重试。
+
+看不到时直接 **跳过集成**，不影响部署与联调。
+
 ---
 
 ## 6. 整体验收（建议按序打勾）
