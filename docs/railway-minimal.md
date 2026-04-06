@@ -22,10 +22,14 @@
 
 **处理**（每个 Service 各做一次）：
 
-1. 打开 Railway → 选中 **对应 Service**（不是整个 Project 的泛泛设置）。  
-2. **Settings** → **Source**（或 **Build**）→ **Root Directory**。  
-3. 填 **`apps/orchestrator-service`** 或 **`apps/bot-service`**（与这个 Service 的职责一致）。  
-4. **保存** 后触发 **Redeploy**。
+1. 先**离开「项目设置」**：点左侧栏最上面的 **画布 / 网格图标**（回到项目画布），**点进你要部署的那一个 Service 卡片**（例如 GitHub 拉起来的那条服务）。  
+2. 打开的是 **Service** 页面后，再点该 Service 上的 **Settings**（或顶部 **Deployments** 旁的设置入口）。  
+3. 在 **Service Settings** 里找 **Source**、**Build** 或 **Root Directory**（Railway 版本不同，名称可能二选一或都有）：把 **Root Directory** 设为 **`apps/orchestrator-service`** 或 **`apps/bot-service`**。  
+4. **不要**在 **Project → Settings → General**（项目名、Visibility 那一页）里找——那里**没有** Root Directory。
+
+若画布上**还没有任何 Service**，请先 **New → GitHub Repo** 创建服务，再对该服务做第 2–3 步。
+
+5. **保存** 后触发 **Redeploy**。
 
 **通过后**的日志里，构建上下文应直接出现 `package.json`、`src/` 等，而**不是**只在根下看到一个 `apps` 文件夹。
 
