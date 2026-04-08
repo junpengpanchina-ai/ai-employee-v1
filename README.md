@@ -205,6 +205,11 @@ npm run dev
 curl http://localhost:8001/health
 ```
 
+## Railway（云端 · monorepo）
+
+- **两个 Service**，同一 GitHub 仓库；**每个 Service** 在 **Settings → Source** 把 **Root Directory** 设为 **`apps/orchestrator-service`** 或 **`apps/bot-service`**。根目录若留空或 `./`，构建会看到 `apps/`、`docs/`、`packages/` 而无 `package.json`，出现 **`start.sh not found` / `Railpack could not determine how to build`**。
+- 各 app 目录内已有 **`railway.toml`**（`npm ci`、`npm start`、健康检查 **`/health`**）。**与 Railway 面板逐项对齐**见 [`docs/railway-minimal.md`](docs/railway-minimal.md) 中的 **「Railway 面板逐项对照」**；变量与全栈顺序见 [`docs/full-stack-integration.md`](docs/full-stack-integration.md)。
+
 ## 当前严格顺序
 
 1. 校准 GRSAI URL / 路径 / 模型名

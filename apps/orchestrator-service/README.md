@@ -27,6 +27,10 @@ AI 总经理 / Orchestrator 服务。
 
 这些能力在后续阶段逐步加入。
 
+## Railway（monorepo）
+
+单独一个 Railway Service，**Settings → Source → Root Directory** = **`apps/orchestrator-service`**（勿用仓库根）。本目录 **`railway.toml`** 声明 `RAILPACK`、`npm ci`、`npm start`、健康检查 **`/health`**。完整清单见 [`docs/railway-minimal.md`](../../docs/railway-minimal.md)。
+
 ## 当前能力
 
 - `GET /health`：健康检查

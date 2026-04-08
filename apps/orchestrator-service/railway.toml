@@ -1,0 +1,11 @@
+# Railway Config as Code — 仅当本目录为 Service 的 Root Directory 时才会被采用。
+# 若 Root 仍指向 monorepo 根，构建阶段看不到本文件，会继续报 Railpack / start.sh 类错误。
+# 文档：docs/railway-minimal.md
+
+[build]
+builder = "RAILPACK"
+buildCommand = "npm ci"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"

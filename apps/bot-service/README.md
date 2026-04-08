@@ -21,6 +21,10 @@ Telegram Webhook 入口服务。
 
 这些能力统一由 `orchestrator-service` 处理。
 
+## Railway（monorepo）
+
+单独一个 Railway Service，**Settings → Source → Root Directory** = **`apps/bot-service`**（勿用仓库根）。本目录 **`railway.toml`** 声明 `RAILPACK`、`npm ci`、`npm start`、健康检查 **`/health`**。完整清单见 [`docs/railway-minimal.md`](../../docs/railway-minimal.md)。
+
 ## 当前能力
 
 - `GET /health`：健康检查

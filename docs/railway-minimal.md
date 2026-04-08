@@ -23,6 +23,55 @@
 
 ---
 
+## Railway 面板逐项对照（与仓库一致）
+
+按下面 **两个 Service** 各配一遍：**同一仓库**、**两个服务卡片**。旧有的、Root 为空且名叫仓库名（如 `ai-employee-v1`）的那条服务要么 **删掉**，要么把 Root 改成下面其一，避免和 monorepo 根混淆。
+
+### 两个 Service 相同的部分
+
+| 你在 Railway 里找的位置 | 填法 |
+|-------------------------|------|
+| **Source / Connect** → 仓库 | 选 **`ai-employee-v1`**（你的 GitHub 仓库名以实际为准） |
+| **Branch** | **`main`**（或你实际发版用的默认分支） |
+| **Networking** | 需要公网打 `health` / Webhook 的服务：**打开公网域名**（Generate domain / Public） |
+
+### Service 1 — 编排 `orchestrator-service`
+
+| 面板项 | 必须与仓库一致（可复制） |
+|--------|---------------------------|
+| 服务显示名（可改） | 建议 **`orchestrator-service`** |
+| **Root Directory**（在 **该 Service** 的 **Settings → Source**，不是 Project 设置） | **`apps/orchestrator-service`** |
+| **Builder** | **`RAILPACK`**（默认即可；与目录内 `railway.toml` 一致） |
+| **Build Command** | 由 **`railway.toml`** 覆盖为 **`npm ci`**；面板里可留空或忽略旧值 |
+| **Start Command** | 由 **`railway.toml`** 为 **`npm start`**（即 `node src/index.js`） |
+| **Healthcheck Path** | **`/health`** |
+
+环境变量只加在 **本服务** → 见下文 **第 1 节 Service A**。
+
+### Service 2 — `bot-service`
+
+| 面板项 | 必须与仓库一致（可复制） |
+|--------|---------------------------|
+| 服务显示名（可改） | 建议 **`bot-service`** |
+| **Root Directory** | **`apps/bot-service`** |
+| **Builder / Build / Start / Healthcheck** | 与同目录 **`railway.toml`** 一致（与 Service 1 相同策略） |
+
+环境变量只加在 **本服务** → 见下文 **第 2 节 Service B**。
+
+### 对齐成功的标志
+
+- 构建日志里 **当前目录** 能直接看到 **`package.json`**、`src/`，**不要**只看到顶层 `apps/`、`docs/`、`packages/`。
+- 部署完成后：
+
+```bash
+curl -sS "https://<编排服务的 Railway 域名>/health"
+curl -sS "https://<Bot 服务的 Railway 域名>/health"
+```
+
+返回 JSON 里 **`service`** 分别为 **`orchestrator-service`** 与 **`bot-service`**。
+
+---
+
 ## 故障速查：Railpack / `start.sh not found` / `could not determine how to build`
 
 若构建日志里 **根目录列出的是** `apps/`、`docs/`、`packages/`、`.env.example`（整仓根），并出现：
@@ -45,6 +94,21 @@
 
 **通过后**的日志里，构建上下文应直接出现 `package.json`、`src/` 等，而**不是**只在根下看到一个 `apps` 文件夹。
 
+### 仓库里的 `railway.toml`（Config as Code）
+
+`apps/orchestrator-service/railway.toml` 与 `apps/bot-service/railway.toml` 已写明：
+
+- **Builder**：`RAILPACK`
+- **Build**：`npm ci`（需同目录下的 `package-lock.json`）
+- **Start**：`npm start`（即 `node src/index.js`）
+- **Healthcheck**：`GET /health`
+
+这些值在部署时会**覆盖**面板里同名的 Build / Start 配置（以 [Railway Config as Code](https://docs.railway.com/config-as-code/reference) 为准）。
+
+**重要**：Railway 只在**当前 Service 的构建根目录**内解析该文件。Root Directory 若仍指向 monorepo 根，**不会**读到 `apps/…/railway.toml`，问题现象与「未设 Root」相同——**必须先设对 Root Directory**，`railway.toml` 才会生效。
+
+若面板提供 **Config file path** 之类选项，一般可留空（默认从 Root 下找 `railway.toml`）；仅当你把 Root 指到别处却想手动指定配置文件时才需要填。
+
 ---
 
 ## 1. Service A：`orchestrator-service`
@@ -52,8 +116,8 @@
 | 设置项 | 建议值 |
 |--------|--------|
 | Root Directory | `apps/orchestrator-service` |
-| Build Command | （默认）`npm install` |
-| Start Command | `npm start`（即 `node src/index.js`） |
+| Build Command | 以目录内 **`railway.toml`** 为准：**`npm ci`**（有 `package-lock.json`） |
+| Start Command | 以 **`railway.toml`** 为准：**`npm start`**（即 `node src/index.js`） |
 
 ### 环境变量（该服务内）
 
@@ -98,7 +162,8 @@ curl -sS -X POST "https://<ORCHESTRATOR_PUBLIC_URL>/internal/ingest/telegram" \
 | 设置项 | 建议值 |
 |--------|--------|
 | Root Directory | `apps/bot-service` |
-| Start Command | `npm start` |
+| Build Command | 同 **`railway.toml`**：**`npm ci`** |
+| Start Command | 同 **`railway.toml`**：**`npm start`** |
 
 ### 环境变量（该服务内）
 

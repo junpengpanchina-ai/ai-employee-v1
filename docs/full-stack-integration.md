@@ -41,8 +41,8 @@ Telegram ──► Railway bot-service ──► Railway orchestrator-service
 
 ## 2. Railway：`orchestrator-service`（第二个接）
 
-> **若构建报 `Error creating build plan with Railpack`：** 与变量、Token 无关，是 **构建上下文不对**（几乎总是 Root Directory 仍指向仓库根）。部署列表里出现 `docs: …` 的 commit 只说明 **Webhook 触发了**，不表示已进子目录。详见 [`railway-minimal.md`](./railway-minimal.md) 文首对照表。  
-> **不要**只建一个名叫仓库名（如 `ai-employee-v1`）且 Root 为空的服务指望它同时跑两个 app——应 **两个 Service**，各设一个 Root。
+> **若构建报 `Error creating build plan with Railpack`、或 `Script start.sh not found` / `could not determine how to build`：** 与变量、Token 无关，是 **构建上下文不对**（几乎总是 Root Directory 仍指向仓库根；日志里会出现 `apps/`、`docs/`、`packages/` 而无顶层 `package.json`）。部署列表里出现 `docs: …` 的 commit 只说明 **Webhook 触发了**，不表示已进子目录。详见 [`railway-minimal.md`](./railway-minimal.md) 中的 **「Railway 面板逐项对照」** 与 **`railway.toml`** 说明。  
+> **不要**只建一个名叫仓库名（如 `ai-employee-v1`）且 Root 为空的服务指望它同时跑两个 app——应 **两个 Service**，各设一个 Root；各 app 目录内已有 **`railway.toml`**（`npm ci` / `npm start` / `/health`），在 Root 正确时由 Railway 自动拾取。
 
 1. **New Project → Deploy from GitHub**，选本仓库。  
 2. **Add Service**（或第一个服务）→ 配置：  
