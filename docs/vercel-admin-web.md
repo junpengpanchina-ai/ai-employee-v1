@@ -17,8 +17,8 @@
 
 | 项 | 值 |
 |----|-----|
-| **Framework Preset** | Next.js（一般会自动识别） |
-| **Root Directory** | 点击 **Edit**，填 **`apps/admin-web`** |
+| **Framework Preset** | **Next.js**（若显示 **Other**，不会执行 `next build`，易出现 **Ready 但 404**、构建仅数秒） |
+| **Root Directory** | 在 **Settings → Build and Deployment**，填 **`apps/admin-web`** |
 | **Build Command** | 留空使用默认，或 `npm run build` |
 | **Install Command** | 留空使用默认，或 `npm install` |
 | **Output Directory** | Next.js 由平台处理，**不要**手填 `dist` |
@@ -72,10 +72,11 @@ vercel --prod # 生产
 
 | 现象 | 处理 |
 |------|------|
+| **Root 已是 `apps/admin-web` 仍 404**，构建只要 **几秒** | **Framework Preset** 误为 **Other** → 改为 **Next.js**，**Save** 后 **Redeploy**；Build Logs 应出现 `next build` 与 `Route (app)` |
 | Build: Cannot find module / no package.json | Root Directory 未设为 **`apps/admin-web`** |
 | 页面里 `NEXT_PUBLIC_*` 全是未配置 | 变量未加在 Vercel，或加完未 **Redeploy** |
 | API 调不通 | 检查 `NEXT_PUBLIC_API_BASE_URL` 是否为 **公网 HTTPS**，且 CORS（若从前端直连）已由后端配置 |
-| 以后要引用 `packages/*` | 在 Vercel 项目 **Settings → General → Root Directory** 中开启 **Include files outside the root directory in the Build Step**（按需） |
+| 以后要引用 `packages/*` | 在 **Build and Deployment** 里 **Root Directory** 旁开启 **Include files outside the root directory in the Build Step**（按需） |
 
 ---
 
