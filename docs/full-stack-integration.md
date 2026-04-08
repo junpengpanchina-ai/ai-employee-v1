@@ -156,6 +156,7 @@ curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 
 ## 8. 相关文档
 
+- **部署总入口（备忘总纲）**：[`cloud-deploy-handbook.md`](./cloud-deploy-handbook.md)  
 - 本地分层测试：[`local-testing.md`](./local-testing.md)  
 - Railway 双服务：[`railway-minimal.md`](./railway-minimal.md)  
 - Vercel 与 404 目录：[`vercel-admin-web.md`](./vercel-admin-web.md)、[`vercel-404-and-paths.md`](./vercel-404-and-paths.md)
