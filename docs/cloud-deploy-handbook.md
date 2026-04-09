@@ -136,7 +136,8 @@ orchestrator 需配置 **`CORS_ORIGIN`**，包含 Vercel 站点源。
 | 日志 | 含义 |
 |------|------|
 | `boot` + `ORCHESTRATOR_BASE_URL` | 启动时编排地址是否正确（勿为 `localhost`、勿漏 `https://`） |
-| `0_secret_mismatch` | Webhook 带 secret 但与 `TELEGRAM_WEBHOOK_SECRET` 不一致 |
+| `0_secret_mismatch` | Webhook 带 secret 但与 `TELEGRAM_WEBHOOK_SECRET` 不一致（常见：Railway 与 `setWebhook` 的 `secret_token` 不一致，或复制时多了空格/换行；代码已对两侧做 **trim**） |
+| `0_secret_mismatch` + `header_present: false` | 有请求未带 secret（扫描、误请求等）；真实用户消息来自 Telegram 时应为 `header_present: true` |
 | `skip_no_message` | 更新类型不是普通文本消息 |
 | `1_webhook_ok` | Webhook 已进入业务逻辑 |
 | `2_forward_orchestrator` + `url=` | 即将请求的 ingest 完整 URL |

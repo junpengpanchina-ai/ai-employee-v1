@@ -66,11 +66,16 @@ app.get("/health", (req, res) => {
 // Telegram Webhook：校验后转发 orchestrator-service
 app.post("/telegram/webhook", async (req, res) => {
   try {
-    const secret = req.headers["x-telegram-bot-api-secret-token"];
+    const rawSecretHeader =
+      req.headers["x-telegram-bot-api-secret-token"] ?? "";
+    const headerSecret = String(rawSecretHeader).trim();
+    const expectedSecret = String(WEBHOOK_SECRET || "").trim();
 
-    if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
+    if (expectedSecret && headerSecret !== expectedSecret) {
       console.warn("[bot-service] pipeline: 0_secret_mismatch", {
-        header_present: Boolean(secret)
+        header_present: Boolean(String(rawSecretHeader).length),
+        header_len: headerSecret.length,
+        expected_len: expectedSecret.length
       });
       return res.status(401).json({ ok: false, error: "invalid webhook secret" });
     }
