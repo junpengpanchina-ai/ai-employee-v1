@@ -69,6 +69,9 @@ app.post("/telegram/webhook", async (req, res) => {
     const secret = req.headers["x-telegram-bot-api-secret-token"];
 
     if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) {
+      console.warn("[bot-service] pipeline: 0_secret_mismatch", {
+        header_present: Boolean(secret)
+      });
       return res.status(401).json({ ok: false, error: "invalid webhook secret" });
     }
 
@@ -76,6 +79,9 @@ app.post("/telegram/webhook", async (req, res) => {
     const message = body.message || body.edited_message;
 
     if (!message) {
+      console.log("[bot-service] pipeline: skip_no_message", {
+        update_keys: Object.keys(body).slice(0, 12)
+      });
       return res.json({ ok: true, skipped: true, reason: "no message payload" });
     }
 
@@ -83,9 +89,14 @@ app.post("/telegram/webhook", async (req, res) => {
     const text = message.text || "";
     const telegramUserId = message.from?.id;
 
-    console.log("[bot-service] incoming:", {
+    console.log("[bot-service] pipeline: 1_webhook_ok", {
       chatId,
-      text
+      text_len: text.length
+    });
+
+    const ingestUrl = `${ORCHESTRATOR_BASE_URL}/internal/ingest/telegram`;
+    console.log("[bot-service] pipeline: 2_forward_orchestrator", {
+      url: ingestUrl
     });
 
     const orchestrator = await forwardToOrchestrator({
@@ -96,18 +107,30 @@ app.post("/telegram/webhook", async (req, res) => {
     });
 
     const replyText = orchestrator?.reply_text;
+    console.log("[bot-service] pipeline: 3_orchestrator_ok", {
+      reply_text_len: replyText ? String(replyText).length : 0,
+      has_reply_text: Boolean(replyText)
+    });
+
     const sendReply = process.env.TELEGRAM_SEND_REPLY !== "false";
     let telegram = { skipped: true };
 
     if (sendReply && replyText) {
       try {
+        console.log("[bot-service] pipeline: 4_send_telegram_start");
         telegram = await sendTelegramReply(chatId, replyText);
+        console.log("[bot-service] pipeline: 5_send_telegram_done", telegram);
       } catch (e) {
         console.error("[bot-service] sendTelegramReply:", e);
         telegram = { ok: false, error: e.message || String(e) };
       }
     } else if (!sendReply) {
       telegram = { skipped: true, reason: "TELEGRAM_SEND_REPLY=false" };
+      console.log("[bot-service] pipeline: skip_send", telegram);
+    } else {
+      console.log("[bot-service] pipeline: skip_send", {
+        reason: "empty_reply_text"
+      });
     }
 
     return res.json({
@@ -117,7 +140,12 @@ app.post("/telegram/webhook", async (req, res) => {
       telegram
     });
   } catch (error) {
-    console.error("[bot-service] webhook error:", error);
+    console.error("[bot-service] pipeline: error", {
+      message: error.message || String(error),
+      status: error.status,
+      orchestrator_base_url: ORCHESTRATOR_BASE_URL,
+      details: error.details
+    });
     const status = error.status >= 400 && error.status < 600 ? error.status : 502;
     return res.status(status).json({
       ok: false,
@@ -148,4 +176,10 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 app.listen(PORT, HOST, () => {
   console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
+  console.log("[bot-service] pipeline: boot", {
+    ORCHESTRATOR_BASE_URL,
+    TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",
+    token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+    webhook_secret_set: Boolean(WEBHOOK_SECRET)
+  });
 });

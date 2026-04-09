@@ -129,6 +129,22 @@ orchestrator 需配置 **`CORS_ORIGIN`**，包含 Vercel 站点源。
 - Webhook URL：`https://<bot 公网域名>/telegram/webhook`
 - 若使用 secret：`TELEGRAM_WEBHOOK_SECRET` 与 `setWebhook` 的 `secret_token` **完全一致**。
 
+### 5.1 用日志定位断点（pipeline）
+
+部署包含 **`[bot-service] pipeline:`** / **`[orchestrator-service] pipeline:`** 前缀的日志。在 **Railway → bot-service / orchestrator-service → Logs** 中，私聊发一条后按序号对照：
+
+| 日志 | 含义 |
+|------|------|
+| `boot` + `ORCHESTRATOR_BASE_URL` | 启动时编排地址是否正确（勿为 `localhost`、勿漏 `https://`） |
+| `0_secret_mismatch` | Webhook 带 secret 但与 `TELEGRAM_WEBHOOK_SECRET` 不一致 |
+| `skip_no_message` | 更新类型不是普通文本消息 |
+| `1_webhook_ok` | Webhook 已进入业务逻辑 |
+| `2_forward_orchestrator` + `url=` | 即将请求的 ingest 完整 URL |
+| `pipeline: error` | 转发 orchestrator 失败（看 `status`、`details`） |
+| `3_orchestrator_ok` + `has_reply_text` | 编排是否返回正文 |
+| `4_send_telegram` / `5_send_telegram_done` | 是否已调 Telegram `sendMessage` |
+| orchestrator `ingest_start` | bot 已打到编排；若 bot 无 `3_` 而编排无此行，多为 URL/网络问题 |
+
 ---
 
 ## 六、现象 → 优先检查（速查）

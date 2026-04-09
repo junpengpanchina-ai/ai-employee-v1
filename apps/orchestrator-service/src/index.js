@@ -37,6 +37,11 @@ app.post("/internal/ingest/telegram", async (req, res) => {
   const text = body.text ?? "";
   const telegramUserId = body.telegramUserId;
 
+  console.log("[orchestrator-service] pipeline: ingest_start", {
+    chatId: chatId != null ? String(chatId) : null,
+    text_len: String(text).length
+  });
+
   if (chatId == null || chatId === "") {
     return res.status(400).json({
       ok: false,
