@@ -12,6 +12,73 @@ const ORCHESTRATOR_BASE_URL = (
   process.env.ORCHESTRATOR_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
+/**
+ * 启动时向 Telegram 登记 Webhook，避免「Railway 里的 secret」与「手动 curl setWebhook」不一致。
+ * 需设置 TELEGRAM_SYNC_WEBHOOK=true 与 BOT_PUBLIC_BASE_URL（https 根，无尾斜杠）。
+ */
+async function syncTelegramWebhookOnBoot() {
+  const flag = String(process.env.TELEGRAM_SYNC_WEBHOOK || "").toLowerCase();
+  if (!["true", "1", "yes"].includes(flag)) {
+    return;
+  }
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const base = String(
+    process.env.BOT_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || ""
+  )
+    .trim()
+    .replace(/\/$/, "");
+
+  if (!token || !base) {
+    console.warn(
+      "[bot-service] TELEGRAM_SYNC_WEBHOOK is set but TELEGRAM_BOT_TOKEN or BOT_PUBLIC_BASE_URL is missing; skip auto setWebhook"
+    );
+    return;
+  }
+
+  if (!/^https:\/\//i.test(base)) {
+    console.warn(
+      "[bot-service] BOT_PUBLIC_BASE_URL must start with https:// ; skip auto setWebhook"
+    );
+    return;
+  }
+
+  const webhookUrl = `${base}/telegram/webhook`;
+  const params = new URLSearchParams();
+  params.set("url", webhookUrl);
+  const sec = String(WEBHOOK_SECRET || "").trim();
+  if (sec) {
+    params.set("secret_token", sec);
+  }
+
+  try {
+    const r = await fetch(
+      `https://api.telegram.org/bot${token}/setWebhook`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
+        },
+        body: params.toString()
+      }
+    );
+    const j = await r.json().catch(() => ({}));
+    if (j.ok) {
+      console.log("[bot-service] TELEGRAM_SYNC_WEBHOOK ok", {
+        webhook_url: webhookUrl,
+        has_secret: Boolean(sec)
+      });
+    } else {
+      console.error("[bot-service] TELEGRAM_SYNC_WEBHOOK failed", {
+        description: j.description,
+        error_code: j.error_code
+      });
+    }
+  } catch (e) {
+    console.error("[bot-service] TELEGRAM_SYNC_WEBHOOK error:", e);
+  }
+}
+
 async function forwardToOrchestrator(payload) {
   const url = `${ORCHESTRATOR_BASE_URL}/internal/ingest/telegram`;
   const res = await fetch(url, {
@@ -179,12 +246,23 @@ logStartupEnv();
 
 const HOST = process.env.HOST || "0.0.0.0";
 
-app.listen(PORT, HOST, () => {
-  console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
-  console.log("[bot-service] pipeline: boot", {
-    ORCHESTRATOR_BASE_URL,
-    TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",
-    token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    webhook_secret_set: Boolean(WEBHOOK_SECRET)
+async function start() {
+  await syncTelegramWebhookOnBoot();
+  app.listen(PORT, HOST, () => {
+    console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
+    console.log("[bot-service] pipeline: boot", {
+      ORCHESTRATOR_BASE_URL,
+      TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",
+      token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+      webhook_secret_set: Boolean(WEBHOOK_SECRET),
+      telegram_sync_webhook: ["true", "1", "yes"].includes(
+        String(process.env.TELEGRAM_SYNC_WEBHOOK || "").toLowerCase()
+      )
+    });
   });
+}
+
+start().catch((e) => {
+  console.error("[bot-service] fatal:", e);
+  process.exit(1);
 });

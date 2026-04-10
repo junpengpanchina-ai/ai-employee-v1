@@ -25,6 +25,8 @@ Telegram Webhook 入口服务。
 
 单独一个 Railway Service，**Settings → Source → Root Directory** = **`apps/bot-service`**（勿用仓库根）。本目录 **`railway.toml`** 声明 `RAILPACK`、`npm ci`、`npm start`、健康检查 **`/health`**。完整清单见 [`docs/railway-minimal.md`](../../docs/railway-minimal.md)。
 
+线上可设 **`TELEGRAM_SYNC_WEBHOOK=true`** 与 **`BOT_PUBLIC_BASE_URL=https://…`**，启动时自动 `setWebhook`，与 **`TELEGRAM_WEBHOOK_SECRET`** 同源，避免与手动 `curl` 不一致导致 401。详见 [`docs/cloud-deploy-handbook.md`](../../docs/cloud-deploy-handbook.md) §5.0。
+
 ## 当前能力
 
 - `GET /health`：健康检查

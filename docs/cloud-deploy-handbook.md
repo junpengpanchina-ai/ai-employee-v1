@@ -129,6 +129,19 @@ orchestrator 需配置 **`CORS_ORIGIN`**，包含 Vercel 站点源。
 - Webhook URL：`https://<bot 公网域名>/telegram/webhook`
 - 若使用 secret：`TELEGRAM_WEBHOOK_SECRET` 与 `setWebhook` 的 `secret_token` **完全一致**。
 
+### 5.0 更好做法：启动时自动 `setWebhook`（推荐）
+
+仓库 **bot-service** 支持：只配 Railway，不必每次在终端 `curl`。
+
+| 变量 | 说明 |
+|------|------|
+| `TELEGRAM_SYNC_WEBHOOK` | 设为 **`true`** 时，进程启动会调用 Telegram `setWebhook` |
+| `BOT_PUBLIC_BASE_URL` | bot 的 **https 根地址**，无尾斜杠，例如 `https://bot-service-production-xxxx.up.railway.app` |
+| `TELEGRAM_BOT_TOKEN` | 必填 |
+| `TELEGRAM_WEBHOOK_SECRET` | 可选；若填写，会自动作为 `secret_token` 登记，与校验逻辑**同源**，避免 401 |
+
+本地开发勿开 `TELEGRAM_SYNC_WEBHOOK`，以免把本地 URL 登记到 Telegram。
+
 ### 5.1 用日志定位断点（pipeline）
 
 部署包含 **`[bot-service] pipeline:`** / **`[orchestrator-service] pipeline:`** 前缀的日志。在 **Railway → bot-service / orchestrator-service → Logs** 中，私聊发一条后按序号对照：
