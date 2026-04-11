@@ -30,6 +30,7 @@ Telegram Webhook 入口服务。
 ## 当前能力
 
 - `GET /health`：健康检查
+- `GET /diagnostics`：环境开关 + 最近 Webhook 事件摘要（无密钥；便于排障）
 - `POST /telegram/webhook`：Telegram Webhook 入口
 - 转发到 `ORCHESTRATOR_BASE_URL`
 - 根据 `reply_text` 调用 Telegram `sendMessage`

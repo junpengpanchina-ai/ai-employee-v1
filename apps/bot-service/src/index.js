@@ -15,15 +15,32 @@ const ORCHESTRATOR_BASE_URL = (
   process.env.ORCHESTRATOR_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
 
+const WEBHOOK_EVENT_CAP = 12;
+/** @type {Array<{ at: string, kind: string, [k: string]: unknown }>} */
+const recentWebhookEvents = [];
+
+function envFlagTelegramSyncWebhook() {
+  return ["true", "1", "yes"].includes(
+    String(process.env.TELEGRAM_SYNC_WEBHOOK || "").trim().toLowerCase()
+  );
+}
+
+function recordWebhookEvent(entry) {
+  recentWebhookEvents.unshift({
+    at: new Date().toISOString(),
+    ...entry
+  });
+  while (recentWebhookEvents.length > WEBHOOK_EVENT_CAP) {
+    recentWebhookEvents.pop();
+  }
+}
+
 /**
  * 启动时向 Telegram 登记 Webhook，避免「Railway 里的 secret」与「手动 curl setWebhook」不一致。
  * 需设置 TELEGRAM_SYNC_WEBHOOK=true 与 BOT_PUBLIC_BASE_URL（https 根，无尾斜杠）。
  */
 async function syncTelegramWebhookOnBoot() {
-  const flag = String(process.env.TELEGRAM_SYNC_WEBHOOK || "")
-    .trim()
-    .toLowerCase();
-  if (!["true", "1", "yes"].includes(flag)) {
+  if (!envFlagTelegramSyncWebhook()) {
     return;
   }
 
@@ -72,14 +89,30 @@ async function syncTelegramWebhookOnBoot() {
         webhook_url: webhookUrl,
         has_secret: Boolean(EXPECTED_WEBHOOK_SECRET)
       });
+      recordWebhookEvent({
+        kind: "boot_set_webhook",
+        ok: true,
+        has_secret: Boolean(EXPECTED_WEBHOOK_SECRET)
+      });
     } else {
       console.error("[bot-service] TELEGRAM_SYNC_WEBHOOK failed", {
         description: j.description,
         error_code: j.error_code
       });
+      recordWebhookEvent({
+        kind: "boot_set_webhook",
+        ok: false,
+        error_code: j.error_code,
+        description: j.description
+      });
     }
   } catch (e) {
     console.error("[bot-service] TELEGRAM_SYNC_WEBHOOK error:", e);
+    recordWebhookEvent({
+      kind: "boot_set_webhook",
+      ok: false,
+      error: e instanceof Error ? e.message : String(e)
+    });
   }
 }
 
@@ -134,6 +167,30 @@ app.get("/health", (req, res) => {
   });
 });
 
+/**
+ * 运维快照：环境开关 + 最近 Webhook 处理摘要（无密钥、无聊天正文）
+ */
+app.get("/diagnostics", (req, res) => {
+  const botBase = String(
+    process.env.BOT_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || ""
+  ).trim();
+  res.json({
+    ok: true,
+    service: "bot-service",
+    time: new Date().toISOString(),
+    uptime_s: Math.round(process.uptime()),
+    config: {
+      orchestrator_base_url: ORCHESTRATOR_BASE_URL,
+      bot_public_base_url_configured: Boolean(botBase),
+      telegram_sync_webhook: envFlagTelegramSyncWebhook(),
+      webhook_secret_configured: Boolean(EXPECTED_WEBHOOK_SECRET),
+      telegram_bot_token_configured: Boolean(process.env.TELEGRAM_BOT_TOKEN),
+      telegram_send_reply: process.env.TELEGRAM_SEND_REPLY ?? "(default true)"
+    },
+    recent_webhook_events: recentWebhookEvents
+  });
+});
+
 // Telegram Webhook：校验后转发 orchestrator-service
 app.post("/telegram/webhook", async (req, res) => {
   try {
@@ -151,6 +208,12 @@ app.post("/telegram/webhook", async (req, res) => {
         received_len,
         expected_len
       });
+      recordWebhookEvent({
+        kind: "secret_mismatch",
+        header_present,
+        received_len,
+        expected_len
+      });
       return res.status(401).json({
         ok: false,
         error: "telegram_webhook_secret_mismatch"
@@ -163,6 +226,10 @@ app.post("/telegram/webhook", async (req, res) => {
     if (!message) {
       console.log("[bot-service] pipeline: skip_no_message", {
         update_keys: Object.keys(body).slice(0, 12)
+      });
+      recordWebhookEvent({
+        kind: "skip_no_message",
+        update_keys_count: Object.keys(body).length
       });
       return res.json({ ok: true, skipped: true, reason: "no message payload" });
     }
@@ -215,6 +282,15 @@ app.post("/telegram/webhook", async (req, res) => {
       });
     }
 
+    recordWebhookEvent({
+      kind: "message_handled",
+      orchestrator_ok: true,
+      has_reply_text: Boolean(replyText),
+      telegram: telegram.skipped
+        ? { skipped: true, reason: telegram.reason || "empty_or_send_failed" }
+        : { ok: telegram.ok !== false }
+    });
+
     return res.json({
       ok: true,
       service: "bot-service",
@@ -229,6 +305,11 @@ app.post("/telegram/webhook", async (req, res) => {
       details: error.details
     });
     const status = error.status >= 400 && error.status < 600 ? error.status : 502;
+    recordWebhookEvent({
+      kind: "handler_error",
+      http_status: status,
+      message: error.message || String(error)
+    });
     return res.status(status).json({
       ok: false,
       error: error.message || "unknown error",
@@ -265,9 +346,7 @@ async function start() {
       TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",
       token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
       webhook_secret_set: Boolean(EXPECTED_WEBHOOK_SECRET),
-      telegram_sync_webhook: ["true", "1", "yes"].includes(
-        String(process.env.TELEGRAM_SYNC_WEBHOOK || "").trim().toLowerCase()
-      )
+      telegram_sync_webhook: envFlagTelegramSyncWebhook()
     });
   });
 }
