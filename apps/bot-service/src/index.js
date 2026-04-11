@@ -7,7 +7,10 @@ const app = express();
 app.use(express.json());
 
 const PORT = Number(process.env.PORT || process.env.BOT_SERVICE_PORT || 8010);
-const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+/** 与 Telegram `setWebhook` 的 `secret_token` 对齐；空字符串表示未启用校验 */
+const EXPECTED_WEBHOOK_SECRET = String(
+  process.env.TELEGRAM_WEBHOOK_SECRET ?? ""
+).trim();
 const ORCHESTRATOR_BASE_URL = (
   process.env.ORCHESTRATOR_BASE_URL || "http://localhost:8001"
 ).replace(/\/$/, "");
@@ -46,9 +49,8 @@ async function syncTelegramWebhookOnBoot() {
   const webhookUrl = `${base}/telegram/webhook`;
   const params = new URLSearchParams();
   params.set("url", webhookUrl);
-  const sec = String(WEBHOOK_SECRET || "").trim();
-  if (sec) {
-    params.set("secret_token", sec);
+  if (EXPECTED_WEBHOOK_SECRET) {
+    params.set("secret_token", EXPECTED_WEBHOOK_SECRET);
   }
 
   try {
@@ -66,7 +68,7 @@ async function syncTelegramWebhookOnBoot() {
     if (j.ok) {
       console.log("[bot-service] TELEGRAM_SYNC_WEBHOOK ok", {
         webhook_url: webhookUrl,
-        has_secret: Boolean(sec)
+        has_secret: Boolean(EXPECTED_WEBHOOK_SECRET)
       });
     } else {
       console.error("[bot-service] TELEGRAM_SYNC_WEBHOOK failed", {
@@ -133,18 +135,24 @@ app.get("/health", (req, res) => {
 // Telegram Webhook：校验后转发 orchestrator-service
 app.post("/telegram/webhook", async (req, res) => {
   try {
-    const rawSecretHeader =
-      req.headers["x-telegram-bot-api-secret-token"] ?? "";
-    const headerSecret = String(rawSecretHeader).trim();
-    const expectedSecret = String(WEBHOOK_SECRET || "").trim();
+    const rawHeader = req.headers["x-telegram-bot-api-secret-token"];
+    const header_present = rawHeader !== undefined;
+    const received = String(rawHeader ?? "").trim();
+    const webhook_secret_set = Boolean(EXPECTED_WEBHOOK_SECRET);
+    const received_len = received.length;
+    const expected_len = EXPECTED_WEBHOOK_SECRET.length;
 
-    if (expectedSecret && headerSecret !== expectedSecret) {
-      console.warn("[bot-service] pipeline: 0_secret_mismatch", {
-        header_present: Boolean(String(rawSecretHeader).length),
-        header_len: headerSecret.length,
-        expected_len: expectedSecret.length
+    if (webhook_secret_set && received !== EXPECTED_WEBHOOK_SECRET) {
+      console.warn("[bot-service] webhook_secret_check", {
+        webhook_secret_set,
+        header_present,
+        received_len,
+        expected_len
       });
-      return res.status(401).json({ ok: false, error: "invalid webhook secret" });
+      return res.status(401).json({
+        ok: false,
+        error: "telegram_webhook_secret_mismatch"
+      });
     }
 
     const body = req.body || {};
@@ -237,7 +245,7 @@ function logStartupEnv() {
     PORT: String(PORT),
     ORCHESTRATOR_BASE_URL,
     TELEGRAM_BOT_TOKEN_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-    TELEGRAM_WEBHOOK_SECRET_set: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
+    TELEGRAM_WEBHOOK_SECRET_set: Boolean(EXPECTED_WEBHOOK_SECRET),
     TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)"
   });
 }
@@ -254,7 +262,7 @@ async function start() {
       ORCHESTRATOR_BASE_URL,
       TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",
       token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
-      webhook_secret_set: Boolean(WEBHOOK_SECRET),
+      webhook_secret_set: Boolean(EXPECTED_WEBHOOK_SECRET),
       telegram_sync_webhook: ["true", "1", "yes"].includes(
         String(process.env.TELEGRAM_SYNC_WEBHOOK || "").toLowerCase()
       )
