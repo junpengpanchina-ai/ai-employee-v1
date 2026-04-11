@@ -20,7 +20,9 @@ const ORCHESTRATOR_BASE_URL = (
  * 需设置 TELEGRAM_SYNC_WEBHOOK=true 与 BOT_PUBLIC_BASE_URL（https 根，无尾斜杠）。
  */
 async function syncTelegramWebhookOnBoot() {
-  const flag = String(process.env.TELEGRAM_SYNC_WEBHOOK || "").toLowerCase();
+  const flag = String(process.env.TELEGRAM_SYNC_WEBHOOK || "")
+    .trim()
+    .toLowerCase();
   if (!["true", "1", "yes"].includes(flag)) {
     return;
   }
@@ -264,7 +266,7 @@ async function start() {
       token_set: Boolean(process.env.TELEGRAM_BOT_TOKEN),
       webhook_secret_set: Boolean(EXPECTED_WEBHOOK_SECRET),
       telegram_sync_webhook: ["true", "1", "yes"].includes(
-        String(process.env.TELEGRAM_SYNC_WEBHOOK || "").toLowerCase()
+        String(process.env.TELEGRAM_SYNC_WEBHOOK || "").trim().toLowerCase()
       )
     });
   });
