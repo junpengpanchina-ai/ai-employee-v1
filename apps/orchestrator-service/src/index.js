@@ -8,6 +8,12 @@ import {
   saveMessage,
   updateJob
 } from "./ledger.js";
+import {
+  classifyInput,
+  fixedReplyCommand,
+  fixedReplyHealthCheck,
+  sanitizeReplyText
+} from "./replyPolicy.js";
 
 dotenv.config();
 
@@ -74,9 +80,12 @@ app.post("/internal/ingest/telegram", async (req, res) => {
   const text = body.text ?? "";
   const telegramUserId = body.telegramUserId;
 
+  const inputKind = classifyInput(text);
+
   console.log("[orchestrator-service] pipeline: ingest_start", {
     chatId: chatId != null ? String(chatId) : null,
-    text_len: String(text).length
+    text_len: String(text).length,
+    input_kind: inputKind
   });
 
   if (chatId == null || chatId === "") {
@@ -118,17 +127,49 @@ app.post("/internal/ingest/telegram", async (req, res) => {
 
   let replyText;
   let grsaiError;
-  try {
-    replyText = await callGRSAI({ userText: text });
-  } catch (e) {
-    grsaiError = e.message || String(e);
-    console.error("[orchestrator-service] callGRSAI:", e);
-    replyText = GRSAI_FAIL_REPLY;
+  let grsaiSkipped = false;
+
+  if (inputKind === "health_check") {
+    const fixed = fixedReplyHealthCheck(text);
+    if (fixed != null) {
+      replyText = fixed;
+      grsaiSkipped = true;
+    } else {
+      try {
+        replyText = await callGRSAI({
+          userText: text,
+          classification: "short_chat"
+        });
+      } catch (e) {
+        grsaiError = e.message || String(e);
+        console.error("[orchestrator-service] callGRSAI:", e);
+        replyText = GRSAI_FAIL_REPLY;
+      }
+    }
+  } else if (inputKind === "command") {
+    replyText = fixedReplyCommand(text);
+    grsaiSkipped = true;
+  } else {
+    try {
+      replyText = await callGRSAI({
+        userText: text,
+        classification:
+          inputKind === "short_chat" ? "short_chat" : "manager_task"
+      });
+    } catch (e) {
+      grsaiError = e.message || String(e);
+      console.error("[orchestrator-service] callGRSAI:", e);
+      replyText = GRSAI_FAIL_REPLY;
+    }
   }
+
+  replyText = sanitizeReplyText(replyText);
 
   const messageMeta = {
     job_id: jobId,
     source: "telegram",
+    input_kind: inputKind,
+    grsai_skipped: grsaiSkipped,
     grsai_error: grsaiError || null
   };
 
@@ -190,6 +231,8 @@ app.post("/internal/ingest/telegram", async (req, res) => {
   console.log("[orchestrator-service] ingest done:", {
     jobId,
     messageId,
+    input_kind: inputKind,
+    grsai_skipped: grsaiSkipped,
     ok: !grsaiError
   });
 
@@ -203,7 +246,9 @@ app.post("/internal/ingest/telegram", async (req, res) => {
       job_id: jobId,
       message_id: messageId,
       reply_text: replyText,
-      grsai_error: grsaiError
+      grsai_error: grsaiError,
+      input_kind: inputKind,
+      grsai_skipped: false
     });
   }
 
@@ -214,7 +259,9 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     job_id: jobId,
     message_id: messageId,
     reply_text: replyText,
-    grsai_error: null
+    grsai_error: null,
+    input_kind: inputKind,
+    grsai_skipped: grsaiSkipped
   });
 });
 

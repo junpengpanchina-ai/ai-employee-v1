@@ -11,9 +11,27 @@ const PORT = Number(process.env.PORT || process.env.BOT_SERVICE_PORT || 8010);
 const EXPECTED_WEBHOOK_SECRET = String(
   process.env.TELEGRAM_WEBHOOK_SECRET ?? ""
 ).trim();
-const ORCHESTRATOR_BASE_URL = (
-  process.env.ORCHESTRATOR_BASE_URL || "http://localhost:8001"
-).replace(/\/$/, "");
+
+/**
+ * 供 fetch 使用：去尾斜杠；无协议时补全（公网默认 https，localhost/127.0.0.1 用 http）。
+ */
+function normalizeOrchestratorBaseUrl() {
+  const raw = process.env.ORCHESTRATOR_BASE_URL;
+  if (raw == null || String(raw).trim() === "") {
+    return "http://localhost:8001";
+  }
+  let t = String(raw).trim().replace(/\/$/, "");
+  if (!/^https?:\/\//i.test(t)) {
+    const isLocal =
+      /^localhost\b/i.test(t) ||
+      /^127\.\d+\.\d+\.\d+/.test(t) ||
+      /^\[?::1\]?:/.test(t);
+    t = `${isLocal ? "http" : "https"}://${t}`;
+  }
+  return t;
+}
+
+const ORCHESTRATOR_BASE_URL = normalizeOrchestratorBaseUrl();
 
 const WEBHOOK_EVENT_CAP = 12;
 /** @type {Array<{ at: string, kind: string, [k: string]: unknown }>} */
@@ -361,13 +379,31 @@ async function start() {
   app.listen(PORT, HOST, () => {
     console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
     console.log(
-      "[bot-service] boot: ORCHESTRATOR_BASE_URL (must match orchestrator Networking domain):",
+      "[bot-service] boot: ORCHESTRATOR_BASE_URL (must be orchestrator Public Domain, not bot):",
       ORCHESTRATOR_BASE_URL
     );
     if (/\/xxxx\b/i.test(ORCHESTRATOR_BASE_URL) || /placeholder/i.test(ORCHESTRATOR_BASE_URL)) {
       console.warn(
         "[bot-service] boot: ORCHESTRATOR_BASE_URL looks like a placeholder; fix in Railway Variables"
       );
+    }
+    const botPublic = String(
+      process.env.BOT_PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URL || ""
+    ).trim();
+    if (botPublic) {
+      try {
+        const oHost = new URL(ORCHESTRATOR_BASE_URL).host;
+        const bHost = new URL(
+          /^https?:\/\//i.test(botPublic) ? botPublic : `https://${botPublic.replace(/\/$/, "")}`
+        ).host;
+        if (oHost === bHost) {
+          console.warn(
+            "[bot-service] boot: ORCHESTRATOR_BASE_URL points at the same host as BOT_PUBLIC_BASE_URL — must be the orchestrator-service domain, not bot-service"
+          );
+        }
+      } catch {
+        /* ignore URL parse errors */
+      }
     }
     console.log("[bot-service] pipeline: boot", {
       ORCHESTRATOR_BASE_URL,
