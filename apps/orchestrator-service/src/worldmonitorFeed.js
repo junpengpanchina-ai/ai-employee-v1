@@ -108,6 +108,27 @@ function extractItemsArray(data) {
 }
 
 /**
+ * 供料请求头：官方 SaaS 用 Bearer；自托管 Vercel WM 常用 X-WorldMonitor-Key（与 WORLDMONITOR_VALID_KEYS 中某一把一致）。
+ * @returns {Record<string, string>}
+ */
+export function buildIntelFeedHeaders() {
+  const h = /** @type {Record<string, string>} */ ({
+    Accept: "application/json"
+  });
+  const bearer = (process.env.WORLDMONITOR_BEARER_TOKEN || "").trim();
+  const gate = (process.env.WORLDMONITOR_GATE_KEY || "").trim();
+  if (bearer) {
+    h.Authorization = bearer.startsWith("Bearer ")
+      ? bearer
+      : `Bearer ${bearer}`;
+  }
+  if (gate) {
+    h["X-WorldMonitor-Key"] = gate;
+  }
+  return h;
+}
+
+/**
  * @returns {Promise<{ configured: boolean, items: IntelItemRaw[], fetchError: string | null }>}
  */
 export async function fetchWorldMonitorFeed() {
@@ -132,7 +153,7 @@ export async function fetchWorldMonitorFeed() {
     console.log("[intel-feed] GET", url);
     const res = await fetch(url, {
       method: "GET",
-      headers: { Accept: "application/json" },
+      headers: buildIntelFeedHeaders(),
       signal: ac
     });
 

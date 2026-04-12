@@ -149,7 +149,7 @@ GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grs
 ### `/intel` 真简报（阶段 B）
 
 - **Telegram** 发 `/intel` → `POST /internal/ingest/telegram` → `runIntelBrief()`（`src/intelRun.js`）→ `worldmonitorFeed.js` 拉取 JSON → `callGRSAIWithSystem` + `src/intelPrompts.js`
-- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`（请求 `…/api/export/intel`）；见 `.env.example`
+- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`（请求 `…/api/export/intel`）；可选 `WORLDMONITOR_BEARER_TOKEN`（官网 REST）或 `WORLDMONITOR_GATE_KEY`（`X-WorldMonitor-Key`，自托管 WM）；见 `.env.example`
 - 说明文档：[`docs/intel-brief-template.md`](../../docs/intel-brief-template.md)
 - 勾选清单：[`docs/worldmonitor-execution-checklist.md`](../../docs/worldmonitor-execution-checklist.md) 阶段 B
 
