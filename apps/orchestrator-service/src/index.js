@@ -12,8 +12,10 @@ import {
   classifyInput,
   fixedReplyCommand,
   fixedReplyHealthCheck,
+  getSlashCommand,
   sanitizeReplyText
 } from "./replyPolicy.js";
+import { runIntelBrief } from "./intelRun.js";
 
 dotenv.config();
 
@@ -147,8 +149,22 @@ app.post("/internal/ingest/telegram", async (req, res) => {
       }
     }
   } else if (inputKind === "command") {
-    replyText = fixedReplyCommand(text);
-    grsaiSkipped = true;
+    const slash = getSlashCommand(text);
+    if (slash === "/intel") {
+      try {
+        const out = await runIntelBrief();
+        replyText = out.replyText;
+        grsaiSkipped = out.grsaiSkipped;
+      } catch (e) {
+        grsaiError = e.message || String(e);
+        console.error("[orchestrator-service] runIntelBrief:", e);
+        replyText = GRSAI_FAIL_REPLY;
+        grsaiSkipped = false;
+      }
+    } else {
+      replyText = fixedReplyCommand(text);
+      grsaiSkipped = true;
+    }
   } else {
     try {
       replyText = await callGRSAI({

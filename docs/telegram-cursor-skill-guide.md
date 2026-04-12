@@ -173,6 +173,8 @@ description: >-
 | [`cloud-deploy-handbook.md`](./cloud-deploy-handbook.md) | 部署总纲、Telegram 小节 |
 | [`full-stack-integration.md`](./full-stack-integration.md) | 全栈变量与接通顺序 |
 | [`local-testing.md`](./local-testing.md) | 本地 health / ingest / 模拟 webhook |
+| [`worldmonitor-integration.md`](./worldmonitor-integration.md) | WorldMonitor 旁挂、后台「情报流」页、阶段 B `/intel` 规划 |
+| [`worldmonitor-plan.md`](./worldmonitor-plan.md) | **WorldMonitor 完整规划总览**（路线图、安全、变量归属） |
 
 ---
 

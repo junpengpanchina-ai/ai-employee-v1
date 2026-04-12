@@ -44,6 +44,17 @@ export function classifyInput(text) {
 }
 
 /**
+ * 取第一个 `/command` 小写 token（含 `/`），非命令则返回空串。
+ * @param {unknown} text
+ * @returns {string}
+ */
+export function getSlashCommand(text) {
+  const t = String(text ?? "").trim();
+  if (!t.startsWith("/")) return "";
+  return t.split(/\s+/)[0].toLowerCase();
+}
+
+/**
  * @param {unknown} text
  * @returns {string | null}
  */

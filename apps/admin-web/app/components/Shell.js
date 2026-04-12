@@ -14,6 +14,12 @@ export function Shell({ children, active }) {
           <Link href="/ops" data-active={active === "ops" ? "true" : "false"}>
             运维探测
           </Link>
+          <Link
+            href="/worldmonitor"
+            data-active={active === "worldmonitor" ? "true" : "false"}
+          >
+            情报流
+          </Link>
         </nav>
       </header>
       <div className="ae-main">{children}</div>

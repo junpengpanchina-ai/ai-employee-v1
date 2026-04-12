@@ -215,6 +215,10 @@ curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
 | [`vercel-admin-web.md`](./vercel-admin-web.md) | Vercel Root、Framework、环境变量与 404 排查 |
 | [`vercel-404-and-paths.md`](./vercel-404-and-paths.md) | 404 时区分仓库路径、Vercel Root、URL |
 | [`local-testing.md`](./local-testing.md) | 本地 health / ingest / webhook 分层测试 |
+| [`worldmonitor-integration.md`](./worldmonitor-integration.md) | WorldMonitor 旁挂、admin-web「情报流」页 |
+| [`worldmonitor-railway.md`](./worldmonitor-railway.md) | **Railway 第三 Service 部署 WM**（构建 / `vite preview` / 接 Vercel） |
+| [`worldmonitor-plan.md`](./worldmonitor-plan.md) | **WorldMonitor 完整规划**（闭环、安全、分阶段、变量归属） |
+| [`worldmonitor-execution-checklist.md`](./worldmonitor-execution-checklist.md) | **WorldMonitor 执行清单**（Railway/Vercel/orch/`/intel` 逐项打勾） |
 
 ---
 

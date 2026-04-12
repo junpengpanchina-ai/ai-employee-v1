@@ -84,3 +84,55 @@ export async function callGRSAI({ userText, classification = "manager_task" }) {
   }
   return String(content).trim();
 }
+
+/**
+ * 自定义 system（如 /intel 趋势分析师人设），user 为完整 user 消息。
+ * @param {{ systemContent: string, userText: string }} p
+ */
+export async function callGRSAIWithSystem({ systemContent, userText }) {
+  const base = process.env.GRSAI_BASE_URL?.replace(/\/$/, "");
+  const key = process.env.GRSAI_API_KEY;
+  const model = process.env.BOT_MODEL || "gpt-4o-mini";
+  const pathSeg = (
+    process.env.GRSAI_COMPLETIONS_PATH || "chat/completions"
+  ).replace(/^\//, "");
+
+  if (!base || !key) {
+    throw new Error("GRSAI_BASE_URL and GRSAI_API_KEY are required");
+  }
+
+  const url = `${base}/${pathSeg}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: "system", content: systemContent },
+        {
+          role: "user",
+          content: userText?.trim() ? userText : "(empty message)"
+        }
+      ]
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg =
+      data?.error?.message ||
+      (typeof data?.error === "string" ? data.error : null) ||
+      JSON.stringify(data).slice(0, 500) ||
+      `GRSAI HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+
+  const content = data?.choices?.[0]?.message?.content;
+  if (content == null || String(content).trim() === "") {
+    throw new Error("GRSAI response missing message content");
+  }
+  return String(content).trim();
+}

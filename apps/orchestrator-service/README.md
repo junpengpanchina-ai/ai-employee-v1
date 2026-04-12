@@ -146,6 +146,13 @@ curl http://localhost:8001/health
 
 GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grsai"`，并带占位 `reply_text`（便于用户侧仍收到提示）。
 
+### `/intel` 真简报（阶段 B）
+
+- **Telegram** 发 `/intel` → `POST /internal/ingest/telegram` → `runIntelBrief()`（`src/intelRun.js`）→ `worldmonitorFeed.js` 拉取 JSON → `callGRSAIWithSystem` + `src/intelPrompts.js`
+- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`（请求 `…/api/export/intel`）；见 `.env.example`
+- 说明文档：[`docs/intel-brief-template.md`](../../docs/intel-brief-template.md)
+- 勾选清单：[`docs/worldmonitor-execution-checklist.md`](../../docs/worldmonitor-execution-checklist.md) 阶段 B
+
 ## 关键环境变量
 
 | 变量名 | 说明 |
