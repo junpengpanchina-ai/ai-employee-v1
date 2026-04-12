@@ -143,6 +143,12 @@ curl -sS "https://<Bot 服务的 Railway 域名>/health"
 curl -sS "https://<ORCHESTRATOR_PUBLIC_URL>/health"
 ```
 
+或使用仓库脚本（**URL 与 `/health` 之间不要空格**；勿保留占位符 `xxxx`）：
+
+```bash
+./scripts/check-orchestrator-health.sh "https://<你的 orchestrator 根域名>"
+```
+
 期望 JSON 含 `"ok":true`，`"service":"orchestrator-service"`。
 
 ### ingest（可选，确认 GRSAI + Supabase 在云端真通）

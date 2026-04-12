@@ -39,7 +39,8 @@
 
 ### 4. 部署与访问
 
-完成首次 **Deploy** 后，使用 Vercel 提供的域名访问；根路径 `/` 会重定向到 **`/ecosystem`** 生态总览页。
+完成首次 **Deploy** 后，使用 Vercel 提供的域名访问；根路径 `/` 会重定向到 **`/ecosystem`** 生态总览页。  
+运维上可在 **`/ops`** 查看 Vercel 服务端对 **`NEXT_PUBLIC_API_BASE_URL/health`** 的探测结果（用于核对 orchestrator 公网地址，不经浏览器 CORS）。
 
 **若浏览器出现 `404: NOT_FOUND`（页面里带 `Code: NOT_FOUND` 与 `sfo1::…` 这类 ID）：**
 

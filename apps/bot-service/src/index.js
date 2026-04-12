@@ -125,7 +125,9 @@ async function forwardToOrchestrator(payload) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || `orchestrator responded ${res.status}`);
+    const err = new Error(
+      data.detail || data.error || `orchestrator responded ${res.status}`
+    );
     err.status = res.status;
     err.details = data;
     throw err;
@@ -256,10 +258,23 @@ app.post("/telegram/webhook", async (req, res) => {
     });
 
     const replyText = orchestrator?.reply_text;
-    console.log("[bot-service] pipeline: 3_orchestrator_ok", {
-      reply_text_len: replyText ? String(replyText).length : 0,
-      has_reply_text: Boolean(replyText)
-    });
+    if (orchestrator?.ok === false) {
+      console.log("[bot-service] pipeline: 3_orchestrator_failed", {
+        stage: orchestrator.stage,
+        error: orchestrator.error,
+        detail:
+          orchestrator.detail != null
+            ? String(orchestrator.detail).slice(0, 500)
+            : undefined,
+        reply_text_len: replyText ? String(replyText).length : 0
+      });
+    } else {
+      console.log("[bot-service] pipeline: 3_orchestrator_ok", {
+        reply_text_len: replyText ? String(replyText).length : 0,
+        has_reply_text: Boolean(replyText),
+        stage: orchestrator?.stage
+      });
+    }
 
     const sendReply = process.env.TELEGRAM_SEND_REPLY !== "false";
     let telegram = { skipped: true };
@@ -284,7 +299,9 @@ app.post("/telegram/webhook", async (req, res) => {
 
     recordWebhookEvent({
       kind: "message_handled",
-      orchestrator_ok: true,
+      orchestrator_ok: orchestrator.ok !== false,
+      orchestrator_stage: orchestrator.stage ?? null,
+      orchestrator_error: orchestrator.error ?? null,
       has_reply_text: Boolean(replyText),
       telegram: telegram.skipped
         ? { skipped: true, reason: telegram.reason || "empty_or_send_failed" }
@@ -302,7 +319,9 @@ app.post("/telegram/webhook", async (req, res) => {
       message: error.message || String(error),
       status: error.status,
       orchestrator_base_url: ORCHESTRATOR_BASE_URL,
-      details: error.details
+      details: error.details,
+      stage: error.details?.stage,
+      orchestrator_error: error.details?.error
     });
     const status = error.status >= 400 && error.status < 600 ? error.status : 502;
     recordWebhookEvent({
@@ -341,6 +360,15 @@ async function start() {
   await syncTelegramWebhookOnBoot();
   app.listen(PORT, HOST, () => {
     console.log(`[bot-service] listening on http://${HOST}:${PORT}`);
+    console.log(
+      "[bot-service] boot: ORCHESTRATOR_BASE_URL (must match orchestrator Networking domain):",
+      ORCHESTRATOR_BASE_URL
+    );
+    if (/\/xxxx\b/i.test(ORCHESTRATOR_BASE_URL) || /placeholder/i.test(ORCHESTRATOR_BASE_URL)) {
+      console.warn(
+        "[bot-service] boot: ORCHESTRATOR_BASE_URL looks like a placeholder; fix in Railway Variables"
+      );
+    }
     console.log("[bot-service] pipeline: boot", {
       ORCHESTRATOR_BASE_URL,
       TELEGRAM_SEND_REPLY: process.env.TELEGRAM_SEND_REPLY ?? "(default true)",

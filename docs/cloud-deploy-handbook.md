@@ -159,6 +159,38 @@ orchestrator 需配置 **`CORS_ORIGIN`**，包含 Vercel 站点源。
 | `4_send_telegram` / `5_send_telegram_done` | 是否已调 Telegram `sendMessage` |
 | orchestrator `ingest_start` | bot 已打到编排；若 bot 无 `3_` 而编排无此行，多为 URL/网络问题 |
 
+### 5.2 逐项排查顺序（主链不通时按序号做）
+
+**① 编排公网是否真存在**  
+Railway → **orchestrator-service** → **Networking**，复制 **https 根地址**（勿手拼、勿保留 `xxxx`）。本机执行：
+
+```bash
+./scripts/check-orchestrator-health.sh "https://<刚复制的根域名>"
+```
+
+或：`curl -sS -w "\nHTTP %{http_code}\n" "https://<根域名>/health"`（**URL 与 `/health` 之间无空格**）。  
+→ **200** 且 JSON 含 `orchestrator-service`：本步通过。  
+→ **`Application not found` / 非 200**：域名错或服务未挂公网，**停在这里**，先修好 Networking 再往下。
+
+**② bot 里的编排地址是否同一串**  
+Railway → **bot-service** → Variables → **`ORCHESTRATOR_BASE_URL`** = **① 的根地址**（`https`、**无尾斜杠**）。保存后 **Redeploy bot**。看启动日志 **`boot: ORCHESTRATOR_BASE_URL`** 是否一致。
+
+**③ Telegram 是否仍报投递错误**  
+
+```bash
+curl -sS "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+```
+
+→ **`last_error_message`** 为空为佳。若 **`401`**：Webhook secret 与 `TELEGRAM_WEBHOOK_SECRET` / `setWebhook` 不一致，或关掉 secret 后重登 Webhook。
+
+**④ 私聊发一条，看 bot 日志停在哪**  
+- 无 **`1_webhook_ok`**：Webhook 未到或 secret 仍错。  
+- 有 **`1`**、无 **`3_orchestrator_ok`** 且 **`orchestrator responded 404`**：回到 **①②**。  
+- 有 **`3`**、无回复：看 **`TELEGRAM_SEND_REPLY`**、orchestrator 是否返回 **`reply_text`**、GRSAI/Supabase 变量。
+
+**⑤ 快照（可选）**  
+浏览器或 `curl` 打开 **`https://<bot 根域名>/diagnostics`**，看 **`config`** 与 **`recent_webhook_events`**。
+
 ---
 
 ## 六、现象 → 优先检查（速查）
@@ -177,6 +209,7 @@ orchestrator 需配置 **`CORS_ORIGIN`**，包含 Vercel 站点源。
 
 | 文档 | 用途 |
 |------|------|
+| [`railway-integration-debug.md`](./railway-integration-debug.md) | **架构 vs 接口 vs 配置**、**`ORCHESTRATOR_BASE_URL` 禁止项**、Webhook 单一策略、**上线前 10 项必检**、现象归类（排障 / 上线 Runbook） |
 | [`railway-minimal.md`](./railway-minimal.md) | Railway 双服务、面板逐项对照、`railway.toml` |
 | [`full-stack-integration.md`](./full-stack-integration.md) | 全栈变量总表与推荐接通顺序 |
 | [`vercel-admin-web.md`](./vercel-admin-web.md) | Vercel Root、Framework、环境变量与 404 排查 |

@@ -95,6 +95,13 @@ curl http://localhost:8001/health
 
 （`time` 为 ISO 8601 时间戳。）
 
+### `GET /ready`
+
+静态配置就绪：检查 `SUPABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、`GRSAI_BASE_URL`、`GRSAI_API_KEY`、`BOT_MODEL` 是否均已非空设置。**不**对 Supabase / GRSAI 发起网络请求。
+
+- 全部具备：`HTTP 200`，`status: "ready"`，`checks` 各布尔为 `true`
+- 否则：`HTTP 503`，`status: "not_ready"`
+
 ### `POST /internal/ingest/telegram`
 
 由 `bot-service` 调用的内部入口。
@@ -121,11 +128,14 @@ curl http://localhost:8001/health
 5. 成功则更新 `jobs` 为 `succeeded`
 6. 失败则更新 `jobs` 为 `failed`
 
-返回示例（节选）：
+响应体约定：**成功**为 `ok: true` 且 `stage: "done"`；**失败**为 `ok: false`，并带 `stage`（`validation` | `supabase` | `grsai` | `internal`）、`error`（短码）、`detail`。
+
+成功示例（节选）：
 
 ```json
 {
   "ok": true,
+  "stage": "done",
   "service": "orchestrator-service",
   "job_id": "...",
   "message_id": "...",
@@ -133,6 +143,8 @@ curl http://localhost:8001/health
   "grsai_error": null
 }
 ```
+
+GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grsai"`，并带占位 `reply_text`（便于用户侧仍收到提示）。
 
 ## 关键环境变量
 
@@ -171,11 +183,12 @@ curl http://localhost:8001/health
 最小验收链路：
 
 1. `GET /health` 正常
-2. `POST /internal/ingest/telegram` 可接收消息
-3. `callGRSAI()` 能返回模型结果
-4. `jobs` 能从 `pending` 更新到 `succeeded` 或 `failed`
-5. `messages` 有真实落账
-6. 返回体中包含 `reply_text`
+2. `GET /ready` 为 `ready`（生产环境关键变量已配置）
+3. `POST /internal/ingest/telegram` 可接收消息；成功时 `ok: true` 且 `stage: "done"`
+4. `callGRSAI()` 能返回模型结果（失败时仍可能 HTTP 200 但 `ok: false`、`stage: "grsai"`）
+5. `jobs` 能从 `pending` 更新到 `succeeded` 或 `failed`
+6. `messages` 有真实落账
+7. 返回体中包含 `reply_text`（成功或 GRSAI 失败时的占位文案）
 
 ## 工程原则
 

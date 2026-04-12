@@ -20,12 +20,49 @@ const PORT = Number(process.env.PORT || process.env.ORCHESTRATOR_PORT || 8001);
 const GRSAI_FAIL_REPLY =
   process.env.GRSAI_FAIL_REPLY || "（模型暂时不可用，请稍后再试。）";
 
+function jsonIngestFail(res, httpStatus, { stage, error, detail, ...extra }) {
+  return res.status(httpStatus).json({
+    ok: false,
+    stage,
+    error,
+    detail: detail != null ? String(detail) : null,
+    ...extra
+  });
+}
+
+function getReadyChecks() {
+  return {
+    has_supabase_url: Boolean((process.env.SUPABASE_URL || "").trim()),
+    has_service_role: Boolean(
+      (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim()
+    ),
+    has_grsai_base: Boolean((process.env.GRSAI_BASE_URL || "").trim()),
+    has_grsai_key: Boolean((process.env.GRSAI_API_KEY || "").trim()),
+    has_bot_model: Boolean((process.env.BOT_MODEL || "").trim())
+  };
+}
+
 app.get("/health", (req, res) => {
   res.json({
     ok: true,
     service: "orchestrator-service",
     time: new Date().toISOString()
   });
+});
+
+/**
+ * 静态配置就绪：仅检查关键环境变量是否存在，不做外网探测。
+ */
+app.get("/ready", (req, res) => {
+  const checks = getReadyChecks();
+  const ready = Object.values(checks).every(Boolean);
+  const payload = {
+    ok: ready,
+    service: "orchestrator-service",
+    status: ready ? "ready" : "not_ready",
+    checks
+  };
+  res.status(ready ? 200 : 503).json(payload);
 });
 
 /**
@@ -43,17 +80,20 @@ app.post("/internal/ingest/telegram", async (req, res) => {
   });
 
   if (chatId == null || chatId === "") {
-    return res.status(400).json({
-      ok: false,
-      error: "chatId is required"
+    return jsonIngestFail(res, 400, {
+      stage: "validation",
+      error: "invalid_request",
+      detail: "chatId is required"
     });
   }
 
   const supabase = getSupabase();
   if (!supabase) {
-    return res.status(503).json({
-      ok: false,
-      error: "Supabase not configured (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)"
+    return jsonIngestFail(res, 503, {
+      stage: "supabase",
+      error: "supabase_not_configured",
+      detail:
+        "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing or empty"
     });
   }
 
@@ -69,7 +109,11 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     jobId = await saveJobPending(supabase, { payload });
   } catch (e) {
     console.error("[orchestrator-service] saveJobPending:", e);
-    return res.status(500).json({ ok: false, error: e.message });
+    return jsonIngestFail(res, 500, {
+      stage: "supabase",
+      error: "ledger_pending_failed",
+      detail: e.message || String(e)
+    });
   }
 
   let replyText;
@@ -109,7 +153,12 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     } catch (e2) {
       console.error("[orchestrator-service] updateJob after message fail:", e2);
     }
-    return res.status(500).json({ ok: false, error: e.message, job_id: jobId });
+    return jsonIngestFail(res, 500, {
+      stage: "supabase",
+      error: "save_message_failed",
+      detail: e.message || String(e),
+      job_id: jobId
+    });
   }
 
   try {
@@ -128,9 +177,10 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     }
   } catch (e) {
     console.error("[orchestrator-service] updateJob:", e);
-    return res.status(500).json({
-      ok: false,
-      error: e.message,
+    return jsonIngestFail(res, 500, {
+      stage: "internal",
+      error: "job_update_failed",
+      detail: e.message || String(e),
       job_id: jobId,
       message_id: messageId,
       reply_text: replyText
@@ -143,13 +193,28 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     ok: !grsaiError
   });
 
+  if (grsaiError) {
+    return res.status(200).json({
+      ok: false,
+      stage: "grsai",
+      error: "grsai_error",
+      detail: grsaiError,
+      service: "orchestrator-service",
+      job_id: jobId,
+      message_id: messageId,
+      reply_text: replyText,
+      grsai_error: grsaiError
+    });
+  }
+
   return res.json({
     ok: true,
+    stage: "done",
     service: "orchestrator-service",
     job_id: jobId,
     message_id: messageId,
     reply_text: replyText,
-    grsai_error: grsaiError || null
+    grsai_error: null
   });
 });
 

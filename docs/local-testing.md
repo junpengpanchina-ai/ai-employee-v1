@@ -43,7 +43,8 @@
 
 未在 `apps/orchestrator-service/.env` 中配置 **Supabase**（或 Key 无效）时：
 
-- **ingest** `POST /internal/ingest/telegram` → **HTTP 503**，body 提示 `Supabase not configured ...`
+- **ingest** `POST /internal/ingest/telegram` → **HTTP 503**，body：`ok: false`，`stage: "supabase"`，`error: "supabase_not_configured"` 等（见 orchestrator README）
+- **`GET /ready`** → **HTTP 503**（`not_ready`），直至上述变量补齐
 - **bot** `POST /telegram/webhook` → 转发 orchestrator 后同样可能为 **HTTP 503**，body 含 `orchestrator_base_url`
 
 此时 **health** 仍应为 **200**。这用于确认「进程与路由正常」，与「账本 + 模型已配对」是两步；配对完成后应再跑一遍清单第 5–6 步，直到 **200** 且 Supabase 有账。

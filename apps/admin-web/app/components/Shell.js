@@ -11,6 +11,9 @@ export function Shell({ children, active }) {
           <Link href="/ecosystem" data-active={active === "ecosystem" ? "true" : "false"}>
             生态总览
           </Link>
+          <Link href="/ops" data-active={active === "ops" ? "true" : "false"}>
+            运维探测
+          </Link>
         </nav>
       </header>
       <div className="ae-main">{children}</div>

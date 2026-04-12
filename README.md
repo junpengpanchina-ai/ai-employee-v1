@@ -243,6 +243,7 @@ curl http://localhost:8001/health
 ## 文档
 
 - [`docs/cloud-deploy-handbook.md`](docs/cloud-deploy-handbook.md) — **云端部署总纲**（Railway / Vercel / Supabase / Telegram；链至各分册）
+- [`docs/railway-integration-debug.md`](docs/railway-integration-debug.md) — **Railway 对接与排障**：架构 vs 接口 vs 配置、清单与现象归类
 - [`docs/ai-manager-role.md`](docs/ai-manager-role.md) — AI 总经理岗位说明书
 - [`docs/system-architecture-v1.md`](docs/system-architecture-v1.md) — 组织架构与技术总纲（V1）
 - [`docs/supabase-schema-v1.sql`](docs/supabase-schema-v1.sql) — Supabase Schema
