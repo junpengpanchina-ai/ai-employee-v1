@@ -26,7 +26,8 @@ export async function runIntelBrief() {
 
   let block = formatIntelItemsForPrompt(feed.items);
   if (feed.fetchError) {
-    block = `（上游拉取异常：${feed.fetchError}）\n\n${block}`;
+    const errShort = String(feed.fetchError).slice(0, 500);
+    block = `（上游拉取异常：${errShort}）\n\n${block}`;
   }
 
   const userPrompt = buildIntelUserPrompt(block);

@@ -205,7 +205,57 @@ Telegram 云端
 
 ---
 
-## 九、相关文档索引
+## 九、WorldMonitor `/intel` 供料仍「Fetch failed」（内网地址已改 http 仍不行）
+
+**现象**：Telegram `/intel` 能出六段简报，但正文里写上游 **`Fetch failed`**，或 orchestrator 日志有 **`[intel-feed] fetch failed`**。
+
+**先确认**：编排器实际请求的 URL 见日志 **`[intel-feed] GET …`**（部署后发一次 `/intel` 即出现）。路径为 **`…/api/export/intel`**（若只用 `WORLDMONITOR_PUBLIC_URL`）或你在 **`WORLDMONITOR_INTEL_EXPORT_URL`** 里写的完整地址。
+
+### 9.1 内网主机名必须等于 Railway 里的「服务名」
+
+`http://worldmonitor.railway.internal` 里的 **`worldmonitor`** 必须与 **Railway 项目里该 Service 的名称**一致（控制台左侧列表里的名字）。若你建服务时叫 `World Monitor` 或 `wm`，DNS 可能是 **`wm.railway.internal`** 而不是 `worldmonitor`。改名或改用正确子域名后再试。
+
+**常见无效写法（已在新版 orchestrator 里尽量自动纠正）：**
+
+- 只写 **`worldmonitor.railway.internal`**、没有 **`http://`** → 不是合法 URL，`fetch` 会失败（现已在代码里自动补 `http://`）。
+- 端口用了 **中文冒号 `：`** 而不是英文 **`:`** → URL 非法（现已把全角冒号替换为半角）。
+- 变量里夹了 **空格**（如 `internal ：4173`）→ 已去掉空白再解析。
+
+若以上都排除后仍 **`ENOTFOUND` / Fetch failed**，说明 **子域名仍不对** 或 **当前运行环境根本解析不了 `*.railway.internal`**（见 9.3），请直接改用 **9.4 公网 HTTPS**。
+
+### 9.2 端口不要用猜的 4173
+
+Railway 容器内进程一般监听 **`process.env.PORT`**（平台注入，常见为 **非 4173**）。内网访问若必须带端口，应与 **WM 服务当前 `PORT` 一致**（看 WM 的 Deploy Logs 或 Variables）。很多情况下 **不带端口**、由平台转发更稳；若带错端口会连接被拒绝，表现为 **`Fetch failed`**。
+
+### 9.3 旧环境仅 IPv6 内网解析
+
+[Railway 文档](https://docs.railway.com/networking/private-networking/how-it-works)：**部分旧环境**里 `*.railway.internal` **只解析到 IPv6**。若 orchestrator 运行时 **IPv6 出网不通**，内网 `fetch` 会失败。此时不要用内网地址，改用下面 **9.4**。
+
+### 9.4 最稳的绕过方式：公网 HTTPS 导出 URL
+
+在 orchestrator 里配置 **`WORLDMONITOR_INTEL_EXPORT_URL`**（或 **`WORLDMONITOR_PUBLIC_URL`** 指向 **WM 的公网根**，如 `https://xxx.up.railway.app`），让请求走 **公网 IPv4**，通常立刻排除 DNS/IPv6/端口问题。
+
+前提仍是：WM（或网关）必须真实提供 **`GET …/api/export/intel`** 且返回 JSON；否则日志会变成 **`[intel-feed] non-OK`** 与 **`HTTP 404`**，而不是网络层 `Fetch failed`。
+
+### 9.5 仍无接口时
+
+若 WM 仅为前端、**尚未实现** `/api/export/intel`，则无论内网还是公网都会 **404 或无法解析**。需要先在 WM 仓库增加导出路由，或把 `WORLDMONITOR_INTEL_EXPORT_URL` 指到任意 **已存在的 JSON** 地址做联调。
+
+### 9.6 分清三类失败（不要和「WM 缺 key」混为一谈）
+
+| orchestrator 日志 | 含义 | 谁排查 |
+|-------------------|------|--------|
+| **`[intel-feed] fetch failed`** + `message` 像 `fetch failed` / `getaddrinfo` / `ECONNREFUSED` | **请求没到达 WM**：DNS、内网主机名、协议/端口、网络层 | orchestrator 的 URL、Railway 私网、公网域名 |
+| **`[intel-feed] non-OK`** + `status: 5xx` + `bodyPreview` 有 HTML/报错片段 | **请求到了 WM**，WM 进程返回了错误页或异常 | **worldmonitor 服务**日志、WM 内环境变量、WM 是否缺 key |
+| **`[intel-feed] non-OK`** + `status: 404` | 路径不对或路由未实现 | 确认本仓库约定为 **`GET …/api/export/intel`**（不是 `/intel/export`） |
+
+本仓库 **orchestrator 不负责** worldmonitor 内部的 GRSAI key；那类问题只在 **WM 返回 200 但 `items` 为空** 或 **WM 自身 500** 时在 **WM 日志**里查。
+
+orchestrator 已打日志：**`[intel-feed] GET <完整 URL>`**、成功/非 2xx 时的 **`status`** 与 **`bodyPreview`**（见 `worldmonitorFeed.js`）。
+
+---
+
+## 十、相关文档索引
 
 | 文档 | 内容 |
 |------|------|
@@ -216,7 +266,7 @@ Telegram 云端
 
 ---
 
-## 十、一句话结论
+## 十一、一句话结论
 
 - **「架构」**在本项目里主要指：**bot 只做入口与回传，orchestrator 负责模型与账本**——除非你发现设计要改，否则多数线上问题来自 **Railway/Telegram 配置与公网 URL 不一致**，而不是接口定义错误。  
 - **先保证 Root、公网根 URL、Webhook/secret 策略、变量一致**，再判断 **orchestrator 返回 JSON**（`ok`、`stage`、`detail`）与 GRSAI/Supabase。  
@@ -224,4 +274,4 @@ Telegram 云端
 
 ---
 
-*若你补充具体错误码、日志片段与当前变量名（打码），可将问题快速映射到 §六 中的某一格。*
+*若你补充具体错误码、日志片段与当前变量名（打码），可将问题快速映射到 §六 中的某一格。WorldMonitor 供料见 **§九**。*

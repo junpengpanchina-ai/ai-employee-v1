@@ -6,15 +6,64 @@
 /** @typedef {{ title?: string, name?: string, source?: string, published_at?: string, summary?: string, url?: string, link?: string }} IntelItemRaw */
 
 /**
+ * 环境变量里常见手误：中文冒号、多余空格，会导致 URL 非法或 fetch 报「解析失败」。
+ * @param {string} s
+ * @returns {string}
+ */
+function sanitizeEnvUrlString(s) {
+  return String(s ?? "")
+    .replace(/\uFF1A/g, ":")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+/**
+ * 无 `http(s)://` 时视为「仅主机或主机:端口」，自动补 `http://`（否则 `fetch` 不是合法绝对 URL）。
+ * @param {string} s
+ * @returns {string}
+ */
+export function ensureAbsoluteHttpUrl(s) {
+  const t = sanitizeEnvUrlString(s);
+  if (!t) return t;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t)) return t;
+  return `http://${t}`;
+}
+
+/**
+ * Railway 私有网络 `*.railway.internal` 应对该主机使用 **http**，不要用 https（无公网证书时会导致 fetch 失败）。
+ * 若 WM 监听非默认端口，请在 URL 里带上 `:PORT`（与 WM 容器内 `PORT` 一致）。
+ * @param {string} url
+ * @returns {string}
+ */
+export function normalizeWorldMonitorUrl(url) {
+  const t = (url || "").trim();
+  if (!t) return t;
+  try {
+    const u = new URL(t);
+    if (u.hostname.endsWith(".railway.internal") && u.protocol === "https:") {
+      u.protocol = "http:";
+      return u.toString().replace(/\/$/, "");
+    }
+  } catch {
+    // 非完整 URL 时原样返回（仅去尾斜杠）
+  }
+  return t.replace(/\/$/, "");
+}
+
+/**
  * 解析 orchestrator 环境变量，得到要请求的 URL；未配置则 null。
  * @returns {string | null}
  */
 export function resolveIntelExportUrl() {
   const direct = (process.env.WORLDMONITOR_INTEL_EXPORT_URL || "").trim();
-  if (direct) return direct.replace(/\/$/, "");
+  if (direct) {
+    return normalizeWorldMonitorUrl(ensureAbsoluteHttpUrl(direct));
+  }
   const base = (process.env.WORLDMONITOR_PUBLIC_URL || "").trim();
   if (!base) return null;
-  return `${base.replace(/\/$/, "")}/api/export/intel`;
+  const baseAbs = ensureAbsoluteHttpUrl(base);
+  const joined = `${baseAbs.replace(/\/$/, "")}/api/export/intel`;
+  return normalizeWorldMonitorUrl(joined);
 }
 
 /**
@@ -73,33 +122,76 @@ export async function fetchWorldMonitorFeed() {
     Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 20))
   );
 
+  const bodyPreviewLen = Math.min(
+    800,
+    Math.max(120, Number(process.env.INTEL_FEED_BODY_LOG_MAX || 400))
+  );
+
   try {
     const ac = AbortSignal.timeout(timeoutMs);
+    console.log("[intel-feed] GET", url);
     const res = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
       signal: ac
     });
+
+    const rawText = await res.text();
+    const preview = rawText.slice(0, bodyPreviewLen);
+
     if (!res.ok) {
+      console.warn("[intel-feed] non-OK", {
+        url,
+        status: res.status,
+        statusText: res.statusText,
+        bodyPreview: preview || "(empty)"
+      });
       return {
         configured: true,
         items: [],
-        fetchError: `HTTP ${res.status}`
+        fetchError: `HTTP ${res.status}${preview ? `: ${preview.slice(0, 200)}` : ""}`
       };
     }
-    const data = await res.json().catch(() => null);
-    if (data == null) {
+
+    let data;
+    try {
+      data = rawText.trim() ? JSON.parse(rawText) : null;
+    } catch (parseErr) {
+      console.warn("[intel-feed] JSON parse error", {
+        url,
+        bodyPreview: preview || "(empty)",
+        message: parseErr instanceof Error ? parseErr.message : String(parseErr)
+      });
       return {
         configured: true,
         items: [],
         fetchError: "响应不是合法 JSON"
       };
     }
+
+    if (data == null) {
+      console.warn("[intel-feed] empty body", { url });
+      return {
+        configured: true,
+        items: [],
+        fetchError: "响应体为空"
+      };
+    }
+
     let items = extractItemsArray(data);
     items = items.slice(0, maxItems);
+    console.log("[intel-feed] ok", {
+      url,
+      status: res.status,
+      itemCount: items.length
+    });
     return { configured: true, items, fetchError: null };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[intel-feed] fetch failed (network/DNS/TLS/timeout)", {
+      url,
+      message: msg
+    });
     return { configured: true, items: [], fetchError: msg };
   }
 }
