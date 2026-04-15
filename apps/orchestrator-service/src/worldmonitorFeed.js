@@ -61,6 +61,25 @@ function looksLikeApiKeyInUrlField(s) {
   return /^wm_[a-f0-9]{16,}$/i.test(t);
 }
 
+/** 已包含导出路径时不要重复拼接（常见误把完整 URL 填进 WORLDMONITOR_PUBLIC_URL） */
+const EXPORT_INTEL_SUFFIX = "/api/export/intel";
+
+/**
+ * @param {string} baseUrl 已 ensureAbsolute 的根或完整导出 URL
+ * @returns {string}
+ */
+export function joinIntelExportPath(baseUrl) {
+  const b = String(baseUrl || "")
+    .trim()
+    .replace(/\/$/, "");
+  if (!b) return b;
+  const lower = b.toLowerCase();
+  if (lower.endsWith(EXPORT_INTEL_SUFFIX)) {
+    return b;
+  }
+  return `${b}${EXPORT_INTEL_SUFFIX}`;
+}
+
 /**
  * 解析 orchestrator 环境变量，得到要请求的 URL；未配置则 null。
  * @returns {string | null}
@@ -75,7 +94,7 @@ export function resolveIntelExportUrl() {
   const base = baseRaw;
   if (!base) return null;
   const baseAbs = ensureAbsoluteHttpUrl(base);
-  const joined = `${baseAbs.replace(/\/$/, "")}/api/export/intel`;
+  const joined = joinIntelExportPath(baseAbs);
   const out = normalizeWorldMonitorUrl(joined);
   try {
     const u = new URL(out);
