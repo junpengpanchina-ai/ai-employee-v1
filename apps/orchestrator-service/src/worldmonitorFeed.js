@@ -51,19 +51,43 @@ export function normalizeWorldMonitorUrl(url) {
 }
 
 /**
+ * 是否把 wm_… 密钥误填进 URL 变量（本地 curl 常见误用）。
+ * @param {string | undefined} s
+ * @returns {boolean}
+ */
+function looksLikeApiKeyInUrlField(s) {
+  const t = (s || "").trim();
+  if (!t || t.includes("://") || t.includes("/")) return false;
+  return /^wm_[a-f0-9]{16,}$/i.test(t);
+}
+
+/**
  * 解析 orchestrator 环境变量，得到要请求的 URL；未配置则 null。
  * @returns {string | null}
  */
 export function resolveIntelExportUrl() {
   const direct = (process.env.WORLDMONITOR_INTEL_EXPORT_URL || "").trim();
+  const baseRaw = (process.env.WORLDMONITOR_PUBLIC_URL || "").trim();
+
   if (direct) {
     return normalizeWorldMonitorUrl(ensureAbsoluteHttpUrl(direct));
   }
-  const base = (process.env.WORLDMONITOR_PUBLIC_URL || "").trim();
+  const base = baseRaw;
   if (!base) return null;
   const baseAbs = ensureAbsoluteHttpUrl(base);
   const joined = `${baseAbs.replace(/\/$/, "")}/api/export/intel`;
-  return normalizeWorldMonitorUrl(joined);
+  const out = normalizeWorldMonitorUrl(joined);
+  try {
+    const u = new URL(out);
+    if (u.hostname.endsWith(".railway.internal")) {
+      console.warn(
+        "[intel-feed] 使用 *.railway.internal：请确认 Railway 项目里存在同名 Service 且已 Online；否则 DNS 会失败。公网可改用 https://….up.railway.app 或官网 api.worldmonitor.app。"
+      );
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
 }
 
 /**
@@ -125,13 +149,44 @@ export function buildIntelFeedHeaders() {
   if (gate) {
     h["X-WorldMonitor-Key"] = gate;
   }
+  h["User-Agent"] = (
+    process.env.INTEL_FEED_USER_AGENT || "ai-employee-v1-orchestrator/1.0"
+  ).trim();
   return h;
+}
+
+/**
+ * @param {unknown} e
+ * @returns {string}
+ */
+function formatNetworkFetchError(e) {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (e instanceof Error && e.cause != null) {
+    const c =
+      e.cause instanceof Error
+        ? e.cause.message
+        : String(e.cause);
+    return `${msg} (cause: ${c})`;
+  }
+  return msg;
 }
 
 /**
  * @returns {Promise<{ configured: boolean, items: IntelItemRaw[], fetchError: string | null }>}
  */
 export async function fetchWorldMonitorFeed() {
+  const directEnv = (process.env.WORLDMONITOR_INTEL_EXPORT_URL || "").trim();
+  const baseEnv = (process.env.WORLDMONITOR_PUBLIC_URL || "").trim();
+  if (
+    looksLikeApiKeyInUrlField(directEnv) ||
+    looksLikeApiKeyInUrlField(baseEnv)
+  ) {
+    const msg =
+      "环境变量误把 wm_… 密钥填进 URL：请把完整 https://… 地址填到 WORLDMONITOR_INTEL_EXPORT_URL 或 WORLDMONITOR_PUBLIC_URL，把密钥放到 WORLDMONITOR_GATE_KEY 或 WORLDMONITOR_BEARER_TOKEN";
+    console.error("[intel-feed] 配置错误", { detail: msg });
+    return { configured: true, items: [], fetchError: msg };
+  }
+
   const url = resolveIntelExportUrl();
   if (!url) {
     return { configured: false, items: [], fetchError: null };
@@ -150,10 +205,14 @@ export async function fetchWorldMonitorFeed() {
 
   try {
     const ac = AbortSignal.timeout(timeoutMs);
-    console.log("[intel-feed] GET", url);
+    const hdr = buildIntelFeedHeaders();
+    console.log("[intel-feed] GET", url, {
+      hasAuthorization: Boolean(hdr.Authorization),
+      hasXWorldMonitorKey: Boolean(hdr["X-WorldMonitor-Key"])
+    });
     const res = await fetch(url, {
       method: "GET",
-      headers: buildIntelFeedHeaders(),
+      headers: hdr,
       signal: ac
     });
 
@@ -208,11 +267,12 @@ export async function fetchWorldMonitorFeed() {
     });
     return { configured: true, items, fetchError: null };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const detail = formatNetworkFetchError(e);
     console.warn("[intel-feed] fetch failed (network/DNS/TLS/timeout)", {
       url,
-      message: msg
+      message: detail,
+      name: e instanceof Error ? e.name : undefined
     });
-    return { configured: true, items: [], fetchError: msg };
+    return { configured: true, items: [], fetchError: detail };
   }
 }

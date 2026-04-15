@@ -148,8 +148,12 @@ GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grs
 
 ### `/intel` 真简报（阶段 B）
 
-- **Telegram** 发 `/intel` → `POST /internal/ingest/telegram` → `runIntelBrief()`（`src/intelRun.js`）→ `worldmonitorFeed.js` 拉取 JSON → `callGRSAIWithSystem` + `src/intelPrompts.js`
-- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`（请求 `…/api/export/intel`）；可选 `WORLDMONITOR_BEARER_TOKEN`（官网 REST）或 `WORLDMONITOR_GATE_KEY`（`X-WorldMonitor-Key`，自托管 WM）；见 `.env.example`
+- **Telegram** 发 `/intel` → `POST /internal/ingest/telegram` → `runIntelBrief()`（`src/intelRun.js`）→ **优先读 Supabase `intel_items`（时间窗口内）** → 若无数据且 `INTEL_SYNC_ON_INTEL_IF_EMPTY` 未关，则先 **sync**（拉 WM 导出并 upsert）→ 仍无则按 `INTEL_FALLBACK_LIVE_FETCH` 决定是否现场 GET 导出（兼容未建表）→ `callGRSAIWithSystem` + `src/intelPrompts.js`
+- **建表**：仓库根 `supabase/migrations/*_intel_items.sql` 在 Supabase 执行一次。
+- **定时供料**：Railway Cron 等定时 `POST /internal/intel/sync`（建议配置 `ORCHESTRATOR_INTERNAL_SECRET` 并在请求头带 `X-Orchestrator-Secret`）。路由实现在 `src/routes/internalIntel.js`。
+- **调试**：`GET /internal/intel/brief?since_hours=24&topic=macro&channel=all`（可选密钥；`topic` 支持别名如 `market`→macro），返回 `reply_text` 与 `meta`（会调用 GRSAI）。
+- **Telegram 变体**：`/intel`、`/intel 48h`、`/intel macro`（按 `intel_items.topic` 过滤）等，由 `src/intelArgs.js` 解析后读库。
+- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`；可选 `WORLDMONITOR_BEARER_TOKEN` / `WORLDMONITOR_GATE_KEY`；`INTEL_SINCE_HOURS`、`INTEL_SYNC_ON_INTEL_IF_EMPTY`、`INTEL_FALLBACK_LIVE_FETCH`；见 `.env.example`
 - 说明文档：[`docs/intel-brief-template.md`](../../docs/intel-brief-template.md)
 - 勾选清单：[`docs/worldmonitor-execution-checklist.md`](../../docs/worldmonitor-execution-checklist.md) 阶段 B
 
@@ -177,7 +181,13 @@ GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grs
 - `jobs`
 - `messages`
 
-后续 `/intel` 与报告能力再进一步接入：
+执行 `supabase/migrations/` 下 SQL 后，供料与简报落账：
+
+- `wm_raw_items` — WM 导出原始 JSON 行
+- `intel_items` — 标准化情报（`dedupe_key` 去重）
+- `intel_briefs` — 每次 `/intel` 或调试接口生成的简报正文与元数据（`INTEL_PERSIST_BRIEFS=false` 可关）
+
+后续报告能力可进一步接入：
 
 - `reports`
 

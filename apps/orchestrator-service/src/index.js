@@ -16,12 +16,14 @@ import {
   sanitizeReplyText
 } from "./replyPolicy.js";
 import { runIntelBrief } from "./intelRun.js";
+import internalIntelRouter from "./routes/internalIntel.js";
 
 dotenv.config();
 
 const app = express();
 app.use(corsMiddleware);
 app.use(express.json());
+app.use(internalIntelRouter);
 
 const PORT = Number(process.env.PORT || process.env.ORCHESTRATOR_PORT || 8001);
 
@@ -152,7 +154,7 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     const slash = getSlashCommand(text);
     if (slash === "/intel") {
       try {
-        const out = await runIntelBrief();
+        const out = await runIntelBrief({ text });
         replyText = out.replyText;
         grsaiSkipped = out.grsaiSkipped;
       } catch (e) {
