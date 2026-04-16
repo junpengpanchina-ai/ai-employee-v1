@@ -153,7 +153,8 @@ GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grs
 - **定时供料**：Railway Cron 等定时 `POST /internal/intel/sync`（建议配置 `ORCHESTRATOR_INTERNAL_SECRET` 并在请求头带 `X-Orchestrator-Secret`）。路由实现在 `src/routes/internalIntel.js`。
 - **调试**：`GET /internal/intel/brief?since_hours=24&topic=macro&channel=all`（可选密钥；`topic` 支持别名如 `market`→macro），返回 `reply_text` 与 `meta`（会调用 GRSAI）。
 - **Telegram 变体**：`/intel`、`/intel 48h`、`/intel macro`（按 `intel_items.topic` 过滤）等，由 `src/intelArgs.js` 解析后读库。
-- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`；可选 `WORLDMONITOR_BEARER_TOKEN` / `WORLDMONITOR_GATE_KEY`；`INTEL_SINCE_HOURS`、`INTEL_SYNC_ON_INTEL_IF_EMPTY`、`INTEL_FALLBACK_LIVE_FETCH`；见 `.env.example`
+- **供料兜底**：`src/intelFeed.js` 按 **WorldMonitor → RSS/Atom/JSON Feed → 内置 mock** 顺序依次尝试，任一层命中即返回；日志里 `[intel-feed] using <source>` 标注实际生效源。官方 `www.worldmonitor.app` **不**对外提供 `/api/export/intel`，需要自建 WM 实例或用 `INTEL_FALLBACK_FEEDS`。
+- **环境变量**：`WORLDMONITOR_INTEL_EXPORT_URL`（推荐）或 `WORLDMONITOR_PUBLIC_URL`；可选 `WORLDMONITOR_BEARER_TOKEN` / `WORLDMONITOR_GATE_KEY`；`INTEL_SINCE_HOURS`、`INTEL_SYNC_ON_INTEL_IF_EMPTY`、`INTEL_FALLBACK_LIVE_FETCH`、`INTEL_FALLBACK_FEEDS`、`INTEL_ALLOW_MOCK`；见 `.env.example`
 - 说明文档：[`docs/intel-brief-template.md`](../../docs/intel-brief-template.md)
 - 勾选清单：[`docs/worldmonitor-execution-checklist.md`](../../docs/worldmonitor-execution-checklist.md) 阶段 B
 

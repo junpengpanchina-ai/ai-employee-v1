@@ -65,6 +65,26 @@ function looksLikeApiKeyInUrlField(s) {
 const EXPORT_INTEL_SUFFIX = "/api/export/intel";
 
 /**
+ * 折叠连续重复的导出后缀：
+ *   https://x/api/export/intel/api/export/intel(/api/export/intel)*
+ * → https://x/api/export/intel
+ * @param {string} url
+ * @returns {string}
+ */
+export function collapseRepeatedExportSuffix(url) {
+  let out = String(url || "").replace(/\/+$/, "");
+  while (true) {
+    const lower = out.toLowerCase();
+    const i = lower.indexOf(
+      `${EXPORT_INTEL_SUFFIX}${EXPORT_INTEL_SUFFIX}`
+    );
+    if (i === -1) return out;
+    out = out.slice(0, i + EXPORT_INTEL_SUFFIX.length) +
+      out.slice(i + EXPORT_INTEL_SUFFIX.length * 2);
+  }
+}
+
+/**
  * @param {string} baseUrl 已 ensureAbsolute 的根或完整导出 URL
  * @returns {string}
  */
@@ -89,12 +109,13 @@ export function resolveIntelExportUrl() {
   const baseRaw = (process.env.WORLDMONITOR_PUBLIC_URL || "").trim();
 
   if (direct) {
-    return normalizeWorldMonitorUrl(ensureAbsoluteHttpUrl(direct));
+    const absolute = ensureAbsoluteHttpUrl(direct);
+    return normalizeWorldMonitorUrl(collapseRepeatedExportSuffix(absolute));
   }
   const base = baseRaw;
   if (!base) return null;
   const baseAbs = ensureAbsoluteHttpUrl(base);
-  const joined = joinIntelExportPath(baseAbs);
+  const joined = joinIntelExportPath(collapseRepeatedExportSuffix(baseAbs));
   const out = normalizeWorldMonitorUrl(joined);
   try {
     const u = new URL(out);

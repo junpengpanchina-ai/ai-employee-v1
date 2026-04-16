@@ -3,11 +3,8 @@ import {
   INTEL_SYSTEM_PROMPT,
   buildIntelUserPrompt
 } from "./intelPrompts.js";
-import {
-  fetchWorldMonitorFeed,
-  formatIntelItemsForPrompt,
-  resolveIntelExportUrl
-} from "./worldmonitorFeed.js";
+import { formatIntelItemsForPrompt } from "./worldmonitorFeed.js";
+import { fetchIntelFeed, anyIntelSourceConfigured } from "./intelFeed.js";
 import { getSupabase } from "./ledger.js";
 import {
   listIntelItemsSince,
@@ -18,9 +15,10 @@ import { INTEL_DEGRADED_REPLY } from "./intelDegraded.js";
 import { persistIntelBriefOutcome } from "./adapters/worldmonitor/intelPersist.js";
 import { parseIntelArgs } from "./intelArgs.js";
 
-const NOT_CONFIGURED_REPLY = `情报源未配置。请在 orchestrator 环境变量中设置其一：
-• WORLDMONITOR_INTEL_EXPORT_URL（推荐，指向返回 JSON 的导出地址）
-• 或 WORLDMONITOR_PUBLIC_URL（将请求 …/api/export/intel）
+const NOT_CONFIGURED_REPLY = `情报源未配置。请在 orchestrator 环境变量中至少设置其一：
+• WORLDMONITOR_INTEL_EXPORT_URL 或 WORLDMONITOR_PUBLIC_URL（自建 WM 实例）
+• INTEL_FALLBACK_FEEDS=<rss1>,<rss2>（RSS/Atom/JSON Feed，逗号分隔）
+• INTEL_ALLOW_MOCK=true（仅用于跑通链路）
 
 详见仓库 docs/worldmonitor-plan.md、docs/worldmonitor-execution-checklist.md。`;
 
@@ -85,7 +83,7 @@ export async function buildIntelBriefResult(overrides = {}) {
 
   const supabase = getSupabase();
 
-  if (!resolveIntelExportUrl()) {
+  if (!anyIntelSourceConfigured()) {
     return {
       replyText: NOT_CONFIGURED_REPLY,
       grsaiSkipped: true,
@@ -150,7 +148,7 @@ export async function buildIntelBriefResult(overrides = {}) {
   };
 
   if (fallbackLive || dbReadError || !supabase) {
-    live = await fetchWorldMonitorFeed();
+    live = await fetchIntelFeed();
     meta.fetchError = live.fetchError;
     if (!live.configured) {
       return {
@@ -175,7 +173,9 @@ export async function buildIntelBriefResult(overrides = {}) {
       });
       return out;
     }
-    meta.dataSource = "live_feed";
+    meta.dataSource = live.source
+      ? `live_feed:${live.source}`
+      : "live_feed";
     meta.itemCount = live.items.length;
     const block = formatIntelItemsForPrompt(live.items);
     const userPrompt = buildIntelUserPrompt(block);

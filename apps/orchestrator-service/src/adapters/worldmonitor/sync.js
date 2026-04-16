@@ -1,10 +1,10 @@
-import { fetchWorldMonitorFeed } from "../../worldmonitorFeed.js";
+import { fetchIntelFeed } from "../../intelFeed.js";
 import { normalizeIntelItem } from "./normalize.js";
 import { upsertIntelItems } from "./intelItemsRepo.js";
 import { upsertWmRawItems } from "./wmRawRepo.js";
 
 /**
- * 拉取 WM 导出 → 写 wm_raw_items → 标准化 → upsert intel_items。
+ * 拉取情报源（WM / RSS / mock）→ 写 wm_raw_items → 标准化 → upsert intel_items。
  * @param {import("@supabase/supabase-js").SupabaseClient | null} supabase
  * @returns {Promise<{
  *   ok: boolean,
@@ -12,11 +12,12 @@ import { upsertWmRawItems } from "./wmRawRepo.js";
  *   stored: number,
  *   stored_raw: number,
  *   configured: boolean,
+ *   source: 'worldmonitor' | 'rss' | 'mock' | 'none',
  *   fetchError: string | null
  * }>}
  */
 export async function syncWorldMonitorIntel(supabase) {
-  const feed = await fetchWorldMonitorFeed();
+  const feed = await fetchIntelFeed();
 
   if (!feed.configured) {
     return {
@@ -25,17 +26,19 @@ export async function syncWorldMonitorIntel(supabase) {
       stored: 0,
       stored_raw: 0,
       configured: false,
+      source: feed.source,
       fetchError: feed.fetchError
     };
   }
 
-  if (feed.fetchError) {
+  if (feed.fetchError && feed.items.length === 0) {
     return {
       ok: false,
       fetched: 0,
       stored: 0,
       stored_raw: 0,
       configured: true,
+      source: feed.source,
       fetchError: feed.fetchError
     };
   }
@@ -47,6 +50,7 @@ export async function syncWorldMonitorIntel(supabase) {
       stored: 0,
       stored_raw: 0,
       configured: true,
+      source: feed.source,
       fetchError: "supabase_not_configured"
     };
   }
@@ -78,6 +82,7 @@ export async function syncWorldMonitorIntel(supabase) {
       stored: 0,
       stored_raw: 0,
       configured: true,
+      source: feed.source,
       fetchError: msg
     };
   }
@@ -88,6 +93,7 @@ export async function syncWorldMonitorIntel(supabase) {
     stored,
     stored_raw,
     configured: true,
+    source: feed.source,
     fetchError: null
   };
 }
