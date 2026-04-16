@@ -148,6 +148,8 @@ GRSAI 调用失败时仍可能 **HTTP 200**，但 **`ok: false`**、`stage: "grs
 
 ### `/intel` 真简报（阶段 B）
 
+> **完整操作手册见 [`docs/intel-runbook.md`](../../docs/intel-runbook.md)**（链路图、变量、内部接口、日志模板、故障排查顺序都在那）。下面只列摘要。
+
 - **Telegram** 发 `/intel` → `POST /internal/ingest/telegram` → `runIntelBrief()`（`src/intelRun.js`）→ **优先读 Supabase `intel_items`（时间窗口内）** → 若无数据且 `INTEL_SYNC_ON_INTEL_IF_EMPTY` 未关，则先 **sync**（拉 WM 导出并 upsert）→ 仍无则按 `INTEL_FALLBACK_LIVE_FETCH` 决定是否现场 GET 导出（兼容未建表）→ `callGRSAIWithSystem` + `src/intelPrompts.js`
 - **建表**：仓库根 `supabase/migrations/*_intel_items.sql` 在 Supabase 执行一次。
 - **定时供料**：Railway Cron 等定时 `POST /internal/intel/sync`（建议配置 `ORCHESTRATOR_INTERNAL_SECRET` 并在请求头带 `X-Orchestrator-Secret`）。路由实现在 `src/routes/internalIntel.js`。
