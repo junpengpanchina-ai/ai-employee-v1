@@ -3,7 +3,7 @@ import { checkInternalSecret } from "../internalAuth.js";
 import { getSupabase } from "../ledger.js";
 import { buildIntelBriefResult } from "../intelRun.js";
 import { syncWorldMonitorIntel } from "../adapters/worldmonitor/sync.js";
-import { resolveTopicFilter, resolveIntelSlot } from "../intelArgs.js";
+import { resolveIntelSlot, parseTopicBucket } from "../intelArgs.js";
 import { notifyTelegramViaBotService } from "../intelNotify.js";
 
 const router = Router();
@@ -72,8 +72,8 @@ router.get("/internal/intel/brief", async (req, res) => {
     null;
   const topicExplicitAll =
     topicRaw != null && /^all|\*$/i.test(String(topicRaw).trim());
-  const topicResolved =
-    topicRaw && !topicExplicitAll ? resolveTopicFilter(topicRaw) : null;
+  const topicBucket =
+    topicRaw && !topicExplicitAll ? parseTopicBucket(topicRaw) : null;
   const channelQ =
     (req.query.channel && String(req.query.channel).trim()) || "all";
   const slotResolved =
@@ -84,7 +84,9 @@ router.get("/internal/intel/brief", async (req, res) => {
   try {
     const out = await buildIntelBriefResult({
       ...(sinceOverride != null ? { sinceHours: sinceOverride } : {}),
-      ...(topicResolved != null ? { intelTopic: topicResolved } : {}),
+      ...(topicBucket != null && topicBucket.length
+        ? { intelTopics: topicBucket }
+        : {}),
       ...(topicExplicitAll ? { applySlotTopicDefault: false } : {}),
       ...(slotResolved ? { intelSlot: slotResolved } : {}),
       intelChannel: channelQ

@@ -16,9 +16,10 @@ import { persistIntelBriefOutcome } from "./adapters/worldmonitor/intelPersist.j
 import {
   parseIntelArgs,
   defaultSinceHoursForIntelSlot,
-  resolveIntelTopicForSlotBrief,
+  resolveIntelTopicBucketForSlotBrief,
   resolveIntelChannelForSlotBrief,
-  resolveTopicFilter
+  parseTopicBucket,
+  normalizeIntelTopicsArray
 } from "./intelArgs.js";
 
 const NOT_CONFIGURED_REPLY = `情报源未配置。请在 orchestrator 环境变量中至少设置其一：
@@ -48,6 +49,7 @@ function normalizedRowsToFeedItems(rows) {
  * @param {{
  *   sinceHours?: number,
  *   intelTopic?: string | null,
+ *   intelTopics?: string[] | null,
  *   intelChannel?: string,
  *   intelSlot?: 'morning' | 'noon' | 'night' | null,
  *   persistMode?: string,
@@ -60,18 +62,37 @@ export async function buildIntelBriefResult(overrides = {}) {
       ? overrides.sinceHours
       : defaultSinceHoursForIntelSlot(overrides.intelSlot);
   const intelSlot = overrides.intelSlot ?? null;
-  const intelTopicRequested =
-    overrides.intelTopic != null && String(overrides.intelTopic).trim() !== ""
-      ? resolveTopicFilter(overrides.intelTopic) ??
-        String(overrides.intelTopic).trim().toLowerCase()
+  let intelTopics =
+    Array.isArray(overrides.intelTopics) && overrides.intelTopics.length > 0
+      ? normalizeIntelTopicsArray(overrides.intelTopics)
       : null;
-  const intelTopic = resolveIntelTopicForSlotBrief(
-    intelSlot,
-    overrides.intelTopic,
-    {
-      skipSlotTopicDefault: overrides.applySlotTopicDefault === false
-    }
-  );
+  if (!intelTopics?.length) {
+    intelTopics = resolveIntelTopicBucketForSlotBrief(
+      intelSlot,
+      overrides.intelTopic,
+      {
+        skipSlotTopicDefault: overrides.applySlotTopicDefault === false
+      }
+    );
+  }
+  const intelTopicJoined = intelTopics?.length ? intelTopics.join(",") : null;
+
+  let intelTopicRequested = null;
+  if (
+    Array.isArray(overrides.intelTopics) &&
+    overrides.intelTopics.length > 0
+  ) {
+    intelTopicRequested = normalizeIntelTopicsArray(
+      overrides.intelTopics
+    ).join(",");
+  } else if (
+    overrides.intelTopic != null &&
+    String(overrides.intelTopic).trim() !== ""
+  ) {
+    intelTopicRequested =
+      parseTopicBucket(overrides.intelTopic)?.join(",") ?? null;
+  }
+
   const intelChannel = resolveIntelChannelForSlotBrief(
     intelSlot,
     overrides.intelChannel
@@ -91,7 +112,7 @@ export async function buildIntelBriefResult(overrides = {}) {
     sinceHours,
     limit: maxItems,
     minImportance,
-    intelTopic,
+    intelTopics,
     intelChannel
   });
 
@@ -99,12 +120,14 @@ export async function buildIntelBriefResult(overrides = {}) {
     dataSource: "unknown",
     itemCount: 0,
     sinceHours,
-    intelTopic,
+    intelTopic: intelTopicJoined,
+    intelTopics,
     intelTopicRequested,
     topicInjectedBySlot:
       Boolean(intelSlot) &&
       intelTopicRequested == null &&
-      intelTopic != null,
+      intelTopics != null &&
+      intelTopics.length > 0,
     intelChannel,
     intelSlot,
     fetchError: null,

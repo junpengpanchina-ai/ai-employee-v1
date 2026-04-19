@@ -46,6 +46,7 @@ export async function upsertIntelItems(supabase, rows) {
  *   sinceHours: number,
  *   limit: number,
  *   minImportance?: number,
+ *   intelTopics?: string[] | null,
  *   intelTopic?: string | null,
  *   intelChannel?: string
  * }} opts
@@ -56,11 +57,19 @@ export async function listIntelItemsSince(supabase, opts) {
     sinceHours,
     limit,
     minImportance = 0,
+    intelTopics = null,
     intelTopic = null,
     intelChannel = "all"
   } = opts;
   const since = new Date(Date.now() - sinceHours * 3600 * 1000).toISOString();
   const fetchLimit = Math.min(300, Math.max(limit * 5, limit));
+
+  const topics =
+    intelTopics != null && intelTopics.length > 0
+      ? intelTopics
+      : intelTopic
+        ? [intelTopic]
+        : null;
 
   let q = supabase
     .from("intel_items")
@@ -69,8 +78,10 @@ export async function listIntelItemsSince(supabase, opts) {
     )
     .gte("captured_at", since);
 
-  if (intelTopic) {
-    q = q.eq("topic", intelTopic);
+  if (topics && topics.length === 1) {
+    q = q.eq("topic", topics[0]);
+  } else if (topics && topics.length > 1) {
+    q = q.in("topic", topics);
   } else if (intelChannel && intelChannel !== "all") {
     q = q.eq("channel", intelChannel);
   }

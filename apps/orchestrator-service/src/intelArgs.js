@@ -211,14 +211,58 @@ export function parseIntelArgs(text) {
 }
 
 /**
- * 显式 topic（Telegram / ?topic=）优先；否则在有 slot 时读 `INTEL_SLOT_<SLOT>_TOPIC`，
- * 未设置该环境变量时：早报 macro、午报 startup、晚报不过滤（与 P2.5 默认策略一致）。
+ * 逗号 / 中文逗号分隔的 topic 列表 → 去重后的 `intel_items.topic` 值数组；整串为 `all/*` 则 null。
+ * @param {unknown} raw
+ * @returns {string[] | null}
+ */
+export function parseTopicBucket(raw) {
+  if (raw == null || String(raw).trim() === "") return null;
+  const s = String(raw).trim();
+  if (/^all|\*$/i.test(s)) return null;
+  const parts = s.split(/[,，]\s*/).map((x) => x.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const seen = new Set();
+  /** @type {string[]} */
+  const out = [];
+  for (const p of parts) {
+    const r = resolveTopicFilter(p);
+    if (!r) continue;
+    if (!seen.has(r)) {
+      seen.add(r);
+      out.push(r);
+    }
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * @param {unknown[]} topics
+ * @returns {string[]}
+ */
+export function normalizeIntelTopicsArray(topics) {
+  const seen = new Set();
+  /** @type {string[]} */
+  const out = [];
+  for (const t of topics || []) {
+    const s = String(t ?? "").trim();
+    if (!s) continue;
+    if (!seen.has(s)) {
+      seen.add(s);
+      out.push(s);
+    }
+  }
+  return out;
+}
+
+/**
+ * 显式 topic（可逗号 bucket）优先；否则在有 slot 时读 `INTEL_SLOT_<SLOT>_TOPIC`（同样支持逗号），
+ * 未设置该环境变量时：早报 `macro`；午报 `startup,tech,general`；晚报不过滤（P2.6）。
  * @param {'morning' | 'noon' | 'night' | null | undefined} intelSlot
  * @param {string | null | undefined} explicitTopic
  * @param {{ skipSlotTopicDefault?: boolean }} [options] `topic=all` 等场景下为 true，禁止按 slot 注入 topic
- * @returns {string | null}
+ * @returns {string[] | null}
  */
-export function resolveIntelTopicForSlotBrief(
+export function resolveIntelTopicBucketForSlotBrief(
   intelSlot,
   explicitTopic,
   options = {}
@@ -229,7 +273,7 @@ export function resolveIntelTopicForSlotBrief(
       ? String(explicitTopic).trim()
       : null;
   if (ex) {
-    return resolveTopicFilter(ex) ?? ex.toLowerCase();
+    return parseTopicBucket(ex);
   }
   if (skip) return null;
   if (!intelSlot) return null;
@@ -239,10 +283,10 @@ export function resolveIntelTopicForSlotBrief(
   if (Object.prototype.hasOwnProperty.call(process.env, envKey)) {
     const raw = String(process.env[envKey] ?? "").trim();
     if (!raw || /^all|\*$/i.test(raw)) return null;
-    return resolveTopicFilter(raw) ?? raw.toLowerCase();
+    return parseTopicBucket(raw);
   }
-  if (intelSlot === "morning") return "macro";
-  if (intelSlot === "noon") return "startup";
+  if (intelSlot === "morning") return ["macro"];
+  if (intelSlot === "noon") return ["startup", "tech", "general"];
   return null;
 }
 

@@ -11,7 +11,7 @@ import { extractIntelBriefSections } from "../../intelBriefSections.js";
  * @param {object} params
  * @param {string} params.replyText
  * @param {boolean} params.grsaiSkipped
- * @param {{ sinceHours: number, degraded?: boolean, intelTopic?: string | null, intelChannel?: string }} params.meta
+ * @param {{ sinceHours: number, degraded?: boolean, intelTopic?: string | null, intelTopics?: string[] | null, intelChannel?: string }} params.meta
  * @param {string[]} params.sourceItemIds
  * @param {string} [params.channel]
  * @param {string} [params.mode]
