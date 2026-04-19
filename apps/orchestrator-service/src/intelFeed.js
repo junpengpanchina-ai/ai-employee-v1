@@ -63,7 +63,7 @@ function capItems(maxItems, items) {
 export async function fetchIntelFeed() {
   const maxItems = Math.min(
     100,
-    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 20))
+    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 80))
   );
   const errors = [];
   const configured = anyIntelSourceConfigured();

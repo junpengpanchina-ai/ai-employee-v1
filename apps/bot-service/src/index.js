@@ -6,6 +6,40 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+/**
+ * orchestrator 定时推送等：经本服务代发 Telegram（不在 orchestrator 放 TELEGRAM_BOT_TOKEN）。
+ */
+function checkBotInternalNotifyAuth(req) {
+  const want = String(
+    process.env.BOT_INTERNAL_SECRET ||
+      process.env.ORCHESTRATOR_INTERNAL_SECRET ||
+      ""
+  ).trim();
+  if (!want) {
+    return {
+      ok: false,
+      status: 503,
+      body: {
+        ok: false,
+        error: "notify_secret_not_configured",
+        detail:
+          "set BOT_INTERNAL_SECRET (or ORCHESTRATOR_INTERNAL_SECRET) on bot-service"
+      }
+    };
+  }
+  const got = String(
+    req.headers["x-bot-internal-secret"] ?? ""
+  ).trim();
+  if (got !== want) {
+    return {
+      ok: false,
+      status: 401,
+      body: { ok: false, error: "unauthorized" }
+    };
+  }
+  return { ok: true };
+}
+
 const PORT = Number(process.env.PORT || process.env.BOT_SERVICE_PORT || 8010);
 /** 与 Telegram `setWebhook` 的 `secret_token` 对齐；空字符串表示未启用校验 */
 const EXPECTED_WEBHOOK_SECRET = String(
@@ -177,6 +211,39 @@ async function sendTelegramReply(chatId, text) {
   }
   return { ok: true, message_id: data.result?.message_id };
 }
+
+/**
+ * POST /internal/notify
+ * Header: X-Bot-Internal-Secret（与 orchestrator 的 BOT_INTERNAL_SECRET 或 ORCHESTRATOR_INTERNAL_SECRET 一致）
+ * Body: { "chat_id": "<telegram chat id>", "text": "…" }
+ */
+app.post("/internal/notify", async (req, res) => {
+  const auth = checkBotInternalNotifyAuth(req);
+  if (!auth.ok) {
+    return res.status(auth.status || 401).json(auth.body);
+  }
+  const body = req.body || {};
+  const chatId = body.chat_id ?? body.chatId;
+  const text = body.text;
+  if (chatId == null || chatId === "") {
+    return res.status(400).json({
+      ok: false,
+      error: "invalid_request",
+      detail: "chat_id is required"
+    });
+  }
+  try {
+    const telegram = await sendTelegramReply(chatId, text);
+    return res.json({ ok: true, telegram });
+  } catch (e) {
+    console.error("[bot-service] /internal/notify:", e);
+    return res.status(500).json({
+      ok: false,
+      error: "send_failed",
+      detail: e.message || String(e)
+    });
+  }
+});
 
 // 健康检查
 app.get("/health", (req, res) => {

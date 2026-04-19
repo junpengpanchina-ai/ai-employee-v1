@@ -235,7 +235,7 @@ export async function fetchWorldMonitorFeed() {
   const timeoutMs = Number(process.env.INTEL_FEED_TIMEOUT_MS || 20000);
   const maxItems = Math.min(
     100,
-    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 20))
+    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 80))
   );
 
   const bodyPreviewLen = Math.min(

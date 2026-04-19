@@ -1,6 +1,6 @@
 import { callGRSAIWithSystem } from "./grsai.js";
 import {
-  INTEL_SYSTEM_PROMPT,
+  buildIntelSystemPrompt,
   buildIntelUserPrompt
 } from "./intelPrompts.js";
 import { formatIntelItemsForPrompt } from "./worldmonitorFeed.js";
@@ -13,7 +13,13 @@ import {
 import { syncWorldMonitorIntel } from "./adapters/worldmonitor/sync.js";
 import { INTEL_DEGRADED_REPLY } from "./intelDegraded.js";
 import { persistIntelBriefOutcome } from "./adapters/worldmonitor/intelPersist.js";
-import { parseIntelArgs } from "./intelArgs.js";
+import {
+  parseIntelArgs,
+  defaultSinceHoursForIntelSlot,
+  resolveIntelTopicForSlotBrief,
+  resolveIntelChannelForSlotBrief,
+  resolveTopicFilter
+} from "./intelArgs.js";
 
 const NOT_CONFIGURED_REPLY = `情报源未配置。请在 orchestrator 环境变量中至少设置其一：
 • WORLDMONITOR_INTEL_EXPORT_URL 或 WORLDMONITOR_PUBLIC_URL（自建 WM 实例）
@@ -42,20 +48,39 @@ function normalizedRowsToFeedItems(rows) {
  * @param {{
  *   sinceHours?: number,
  *   intelTopic?: string | null,
- *   intelChannel?: string
+ *   intelChannel?: string,
+ *   intelSlot?: 'morning' | 'noon' | 'night' | null,
+ *   persistMode?: string,
+ *   applySlotTopicDefault?: boolean
  * }} [overrides]
  */
 export async function buildIntelBriefResult(overrides = {}) {
   const sinceHours =
     overrides.sinceHours != null
       ? overrides.sinceHours
-      : Number(process.env.INTEL_SINCE_HOURS || 24);
-  const intelTopic = overrides.intelTopic ?? null;
-  const intelChannel = overrides.intelChannel ?? "all";
+      : defaultSinceHoursForIntelSlot(overrides.intelSlot);
+  const intelSlot = overrides.intelSlot ?? null;
+  const intelTopicRequested =
+    overrides.intelTopic != null && String(overrides.intelTopic).trim() !== ""
+      ? resolveTopicFilter(overrides.intelTopic) ??
+        String(overrides.intelTopic).trim().toLowerCase()
+      : null;
+  const intelTopic = resolveIntelTopicForSlotBrief(
+    intelSlot,
+    overrides.intelTopic,
+    {
+      skipSlotTopicDefault: overrides.applySlotTopicDefault === false
+    }
+  );
+  const intelChannel = resolveIntelChannelForSlotBrief(
+    intelSlot,
+    overrides.intelChannel
+  );
+  const persistMode = overrides.persistMode ?? "manual";
 
   const maxItems = Math.min(
     100,
-    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 20))
+    Math.max(1, Number(process.env.INTEL_FEED_MAX_ITEMS || 80))
   );
   const minImportance = Number(process.env.INTEL_MIN_IMPORTANCE || 0);
   const syncIfEmpty = process.env.INTEL_SYNC_ON_INTEL_IF_EMPTY !== "false";
@@ -75,11 +100,19 @@ export async function buildIntelBriefResult(overrides = {}) {
     itemCount: 0,
     sinceHours,
     intelTopic,
+    intelTopicRequested,
+    topicInjectedBySlot:
+      Boolean(intelSlot) &&
+      intelTopicRequested == null &&
+      intelTopic != null,
     intelChannel,
+    intelSlot,
     fetchError: null,
     degraded: false,
     lastCapturedAt: null
   };
+
+  const systemPrompt = buildIntelSystemPrompt(intelSlot);
 
   const supabase = getSupabase();
 
@@ -126,9 +159,9 @@ export async function buildIntelBriefResult(overrides = {}) {
     const block = formatIntelItemsForPrompt(
       normalizedRowsToFeedItems(rows)
     );
-    const userPrompt = buildIntelUserPrompt(block);
+    const userPrompt = buildIntelUserPrompt(block, intelSlot);
     const replyText = await callGRSAIWithSystem({
-      systemContent: INTEL_SYSTEM_PROMPT,
+      systemContent: systemPrompt,
       userText: userPrompt
     });
     const out = { replyText, grsaiSkipped: false, meta };
@@ -136,6 +169,7 @@ export async function buildIntelBriefResult(overrides = {}) {
       replyText,
       grsaiSkipped: false,
       meta,
+      mode: persistMode,
       sourceItemIds: rows.map((r) => r.id)
     });
     return out;
@@ -169,6 +203,7 @@ export async function buildIntelBriefResult(overrides = {}) {
         replyText: INTEL_DEGRADED_REPLY,
         grsaiSkipped: true,
         meta,
+        mode: persistMode,
         sourceItemIds: []
       });
       return out;
@@ -178,9 +213,9 @@ export async function buildIntelBriefResult(overrides = {}) {
       : "live_feed";
     meta.itemCount = live.items.length;
     const block = formatIntelItemsForPrompt(live.items);
-    const userPrompt = buildIntelUserPrompt(block);
+    const userPrompt = buildIntelUserPrompt(block, intelSlot);
     const replyText = await callGRSAIWithSystem({
-      systemContent: INTEL_SYSTEM_PROMPT,
+      systemContent: systemPrompt,
       userText: userPrompt
     });
     const out = { replyText, grsaiSkipped: false, meta };
@@ -188,6 +223,7 @@ export async function buildIntelBriefResult(overrides = {}) {
       replyText,
       grsaiSkipped: false,
       meta,
+      mode: persistMode,
       sourceItemIds: []
     });
     return out;
@@ -205,6 +241,7 @@ export async function buildIntelBriefResult(overrides = {}) {
       replyText: INTEL_DEGRADED_REPLY,
       grsaiSkipped: true,
       meta,
+      mode: persistMode,
       sourceItemIds: []
     });
     return out;
@@ -213,9 +250,9 @@ export async function buildIntelBriefResult(overrides = {}) {
   meta.dataSource = "empty_window";
   meta.itemCount = 0;
   const block = formatIntelItemsForPrompt([]);
-  const userPrompt = buildIntelUserPrompt(block);
+  const userPrompt = buildIntelUserPrompt(block, intelSlot);
   const replyText = await callGRSAIWithSystem({
-    systemContent: INTEL_SYSTEM_PROMPT,
+    systemContent: systemPrompt,
     userText: userPrompt
   });
   const out = { replyText, grsaiSkipped: false, meta };
@@ -223,6 +260,7 @@ export async function buildIntelBriefResult(overrides = {}) {
     replyText,
     grsaiSkipped: false,
     meta,
+    mode: persistMode,
     sourceItemIds: []
   });
   return out;
