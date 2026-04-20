@@ -187,7 +187,36 @@ async function forwardToOrchestrator(payload) {
   return data;
 }
 
-async function sendTelegramReply(chatId, text) {
+/**
+ * @param {{ text?: string, url?: string }[] | null | undefined} linkButtons
+ * @returns {Record<string, unknown> | undefined}
+ */
+function buildInlineUrlReplyMarkup(linkButtons) {
+  if (!Array.isArray(linkButtons) || linkButtons.length === 0) return undefined;
+  /** @type {Array<Array<{ text: string, url: string }>>} */
+  const rows = [];
+  for (const b of linkButtons.slice(0, 10)) {
+    const text = String(b?.text ?? "链接").slice(0, 64);
+    const rawUrl = String(b?.url ?? "").trim();
+    if (!/^https?:\/\//i.test(rawUrl)) continue;
+    try {
+      const u = new URL(rawUrl);
+      if (u.protocol !== "http:" && u.protocol !== "https:") continue;
+    } catch {
+      continue;
+    }
+    rows.push([{ text, url: rawUrl }]);
+  }
+  if (rows.length === 0) return undefined;
+  return { inline_keyboard: rows };
+}
+
+/**
+ * @param {string | number} chatId
+ * @param {string} text
+ * @param {{ text?: string, url?: string }[] | null | undefined} [linkButtons]
+ */
+async function sendTelegramReply(chatId, text, linkButtons) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     return { skipped: true, reason: "no TELEGRAM_BOT_TOKEN" };
@@ -196,14 +225,19 @@ async function sendTelegramReply(chatId, text) {
     return { skipped: true, reason: "empty reply_text" };
   }
 
+  const reply_markup = buildInlineUrlReplyMarkup(linkButtons);
   const url = `https://api.telegram.org/bot${token}/sendMessage`;
+  const payload = {
+    chat_id: chatId,
+    text: String(text).slice(0, 4096)
+  };
+  if (reply_markup) {
+    payload.reply_markup = reply_markup;
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: String(text).slice(0, 4096)
-    })
+    body: JSON.stringify(payload)
   });
   const data = await res.json().catch(() => ({}));
   if (!data.ok) {
@@ -225,6 +259,7 @@ app.post("/internal/notify", async (req, res) => {
   const body = req.body || {};
   const chatId = body.chat_id ?? body.chatId;
   const text = body.text;
+  const linkButtons = body.link_buttons ?? body.linkButtons;
   if (chatId == null || chatId === "") {
     return res.status(400).json({
       ok: false,
@@ -233,7 +268,7 @@ app.post("/internal/notify", async (req, res) => {
     });
   }
   try {
-    const telegram = await sendTelegramReply(chatId, text);
+    const telegram = await sendTelegramReply(chatId, text, linkButtons);
     return res.json({ ok: true, telegram });
   } catch (e) {
     console.error("[bot-service] /internal/notify:", e);
@@ -367,7 +402,11 @@ app.post("/telegram/webhook", async (req, res) => {
     if (sendReply && replyText) {
       try {
         console.log("[bot-service] pipeline: 4_send_telegram_start");
-        telegram = await sendTelegramReply(chatId, replyText);
+        telegram = await sendTelegramReply(
+          chatId,
+          replyText,
+          orchestrator?.link_buttons ?? orchestrator?.linkButtons
+        );
         console.log("[bot-service] pipeline: 5_send_telegram_done", telegram);
       } catch (e) {
         console.error("[bot-service] sendTelegramReply:", e);

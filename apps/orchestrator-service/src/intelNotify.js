@@ -5,9 +5,10 @@
 /**
  * @param {string | number} chatId
  * @param {string} text
+ * @param {{ text: string, url: string }[] | null | undefined} [linkButtons] Telegram Inline url 按钮
  * @returns {Promise<{ ok: boolean, skipped?: boolean, reason?: string, detail?: string }>}
  */
-export async function notifyTelegramViaBotService(chatId, text) {
+export async function notifyTelegramViaBotService(chatId, text, linkButtons) {
   const base = String(process.env.BOT_SERVICE_BASE_URL || "")
     .trim()
     .replace(/\/$/, "");
@@ -43,7 +44,10 @@ export async function notifyTelegramViaBotService(chatId, text) {
       },
       body: JSON.stringify({
         chat_id: chatId,
-        text: String(text).slice(0, 4096)
+        text: String(text).slice(0, 4096),
+        ...(Array.isArray(linkButtons) && linkButtons.length > 0
+          ? { link_buttons: linkButtons }
+          : {})
       })
     });
   } catch (e) {

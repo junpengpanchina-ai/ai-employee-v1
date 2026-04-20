@@ -21,6 +21,10 @@ import {
   parseTopicBucket,
   normalizeIntelTopicsArray
 } from "./intelArgs.js";
+import {
+  extractIntelUrlLinkButtons,
+  getIntelTelegramLinkButtonsMax
+} from "./intelTelegramLinks.js";
 
 const NOT_CONFIGURED_REPLY = `情报源未配置。请在 orchestrator 环境变量中至少设置其一：
 • WORLDMONITOR_INTEL_EXPORT_URL 或 WORLDMONITOR_PUBLIC_URL（自建 WM 实例）
@@ -187,7 +191,13 @@ export async function buildIntelBriefResult(overrides = {}) {
       systemContent: systemPrompt,
       userText: userPrompt
     });
+    const linkMax = getIntelTelegramLinkButtonsMax();
+    const sourceLinkButtons = extractIntelUrlLinkButtons(rows, linkMax);
+    meta.link_button_count = sourceLinkButtons.length;
     const out = { replyText, grsaiSkipped: false, meta };
+    if (sourceLinkButtons.length) {
+      out.sourceLinkButtons = sourceLinkButtons;
+    }
     await persistIntelBriefOutcome(supabase, {
       replyText,
       grsaiSkipped: false,
@@ -241,7 +251,13 @@ export async function buildIntelBriefResult(overrides = {}) {
       systemContent: systemPrompt,
       userText: userPrompt
     });
+    const linkMax = getIntelTelegramLinkButtonsMax();
+    const sourceLinkButtons = extractIntelUrlLinkButtons(live.items, linkMax);
+    meta.link_button_count = sourceLinkButtons.length;
     const out = { replyText, grsaiSkipped: false, meta };
+    if (sourceLinkButtons.length) {
+      out.sourceLinkButtons = sourceLinkButtons;
+    }
     await persistIntelBriefOutcome(supabase, {
       replyText,
       grsaiSkipped: false,
@@ -292,13 +308,16 @@ export async function buildIntelBriefResult(overrides = {}) {
 /**
  * Telegram `/intel` 及变体：解析参数后读库 → 同步 → GRSAI；简报落 intel_briefs。
  * @param {{ text?: string }} [options] 完整消息文本，如 `/intel 48h`、`/intel macro`
- * @returns {Promise<{ replyText: string, grsaiSkipped: boolean }>}
+ * @returns {Promise<{ replyText: string, grsaiSkipped: boolean, sourceLinkButtons?: { text: string, url: string }[] }>}
  */
 export async function runIntelBrief(options = {}) {
   const args = parseIntelArgs(options.text ?? "/intel");
   const out = await buildIntelBriefResult(args);
   return {
     replyText: out.replyText,
-    grsaiSkipped: out.grsaiSkipped
+    grsaiSkipped: out.grsaiSkipped,
+    ...(out.sourceLinkButtons?.length
+      ? { sourceLinkButtons: out.sourceLinkButtons }
+      : {})
   };
 }

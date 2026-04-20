@@ -189,7 +189,11 @@ router.post("/internal/intel/push", async (req, res) => {
     });
     const prefix = SLOT_PUSH_PREFIX[slot] || "【情报】";
     const body = `${prefix}\n\n${out.replyText}`;
-    const telegram = await notifyTelegramViaBotService(chatId, body);
+    const telegram = await notifyTelegramViaBotService(
+      chatId,
+      body,
+      out.sourceLinkButtons
+    );
     const delivered =
       telegram.ok === true && !telegram.skipped;
     const httpStatus = delivered ? 200 : telegram.skipped ? 503 : 502;
@@ -198,6 +202,9 @@ router.post("/internal/intel/push", async (req, res) => {
       reply_text: out.replyText,
       grsai_skipped: out.grsaiSkipped,
       meta: out.meta,
+      ...(out.sourceLinkButtons?.length
+        ? { source_link_buttons: out.sourceLinkButtons }
+        : {}),
       telegram
     });
   } catch (e) {

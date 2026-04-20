@@ -132,6 +132,8 @@ app.post("/internal/ingest/telegram", async (req, res) => {
   let replyText;
   let grsaiError;
   let grsaiSkipped = false;
+  /** @type {{ text: string, url: string }[] | undefined} */
+  let intelLinkButtons;
 
   if (inputKind === "health_check") {
     const fixed = fixedReplyHealthCheck(text);
@@ -157,6 +159,9 @@ app.post("/internal/ingest/telegram", async (req, res) => {
         const out = await runIntelBrief({ text });
         replyText = out.replyText;
         grsaiSkipped = out.grsaiSkipped;
+        if (out.sourceLinkButtons?.length) {
+          intelLinkButtons = out.sourceLinkButtons;
+        }
       } catch (e) {
         grsaiError = e.message || String(e);
         console.error("[orchestrator-service] runIntelBrief:", e);
@@ -279,7 +284,8 @@ app.post("/internal/ingest/telegram", async (req, res) => {
     reply_text: replyText,
     grsai_error: null,
     input_kind: inputKind,
-    grsai_skipped: grsaiSkipped
+    grsai_skipped: grsaiSkipped,
+    ...(intelLinkButtons?.length ? { link_buttons: intelLinkButtons } : {})
   });
 });
 
