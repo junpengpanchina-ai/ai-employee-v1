@@ -4,15 +4,9 @@ import { getSupabase } from "../ledger.js";
 import { buildIntelBriefResult } from "../intelRun.js";
 import { syncWorldMonitorIntel } from "../adapters/worldmonitor/sync.js";
 import { resolveIntelSlot, parseTopicBucket } from "../intelArgs.js";
-import { notifyTelegramViaBotService } from "../intelNotify.js";
+import { runIntelScheduledPush } from "../intelScheduledPush.js";
 
 const router = Router();
-
-const SLOT_PUSH_PREFIX = {
-  morning: "【情报·早报】",
-  noon: "【情报·午报】",
-  night: "【情报·晚报】"
-};
 
 /**
  * 手动 / 定时：拉 WM 导出 → wm_raw_items / intel_items
@@ -182,30 +176,23 @@ router.post("/internal/intel/push", async (req, res) => {
   }
 
   try {
-    const out = await buildIntelBriefResult({
-      intelSlot: slot,
-      persistMode: `scheduled_${slot}`,
+    const result = await runIntelScheduledPush({
+      slot,
+      chatId,
+      syncFirst: wantSync,
       ...(sinceOverride != null ? { sinceHours: sinceOverride } : {})
     });
-    const prefix = SLOT_PUSH_PREFIX[slot] || "【情报】";
-    const body = `${prefix}\n\n${out.replyText}`;
-    const telegram = await notifyTelegramViaBotService(
-      chatId,
-      body,
-      out.sourceLinkButtons
-    );
-    const delivered =
-      telegram.ok === true && !telegram.skipped;
-    const httpStatus = delivered ? 200 : telegram.skipped ? 503 : 502;
+    const delivered = result.delivered;
+    const httpStatus = delivered ? 200 : result.telegram?.skipped ? 503 : 502;
     return res.status(httpStatus).json({
       ok: delivered,
-      reply_text: out.replyText,
-      grsai_skipped: out.grsaiSkipped,
-      meta: out.meta,
-      ...(out.sourceLinkButtons?.length
-        ? { source_link_buttons: out.sourceLinkButtons }
+      reply_text: result.reply_text,
+      grsai_skipped: result.grsai_skipped,
+      meta: result.meta,
+      ...(result.source_link_buttons?.length
+        ? { source_link_buttons: result.source_link_buttons }
         : {}),
-      telegram
+      telegram: result.telegram
     });
   } catch (e) {
     console.error("[orchestrator-service] /internal/intel/push:", e);

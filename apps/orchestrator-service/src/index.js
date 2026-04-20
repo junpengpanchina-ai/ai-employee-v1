@@ -17,6 +17,7 @@ import {
 } from "./replyPolicy.js";
 import { runIntelBrief } from "./intelRun.js";
 import internalIntelRouter from "./routes/internalIntel.js";
+import { startIntelAutoPushScheduler } from "./intelPushScheduler.js";
 
 dotenv.config();
 
@@ -318,4 +319,5 @@ app.listen(PORT, HOST, () => {
   console.log(
     `[orchestrator-service] listening on http://${HOST}:${PORT}`
   );
+  startIntelAutoPushScheduler();
 });
