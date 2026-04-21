@@ -319,5 +319,21 @@ app.listen(PORT, HOST, () => {
   console.log(
     `[orchestrator-service] listening on http://${HOST}:${PORT}`
   );
-  startIntelAutoPushScheduler();
+  const push = startIntelAutoPushScheduler();
+  if (!push.started && push.reason !== "already_started") {
+    console.warn("[intel-auto-push] NOT scheduled:", push.reason, {
+      ...(push.detail || {}),
+      INTEL_AUTO_PUSH_ENABLED: String(
+        process.env.INTEL_AUTO_PUSH_ENABLED ?? "(unset)"
+      ).trim(),
+      hint:
+        push.reason === "missing_push_env"
+          ? "On orchestrator: TELEGRAM_BOSS_CHAT_ID, BOT_SERVICE_BASE_URL, BOT_INTERNAL_SECRET or ORCHESTRATOR_INTERNAL_SECRET."
+          : push.reason === "explicit_disabled"
+            ? "Unset INTEL_AUTO_PUSH_ENABLED or set true."
+            : push.reason === "invalid_cron_all"
+              ? "Fix INTEL_AUTO_PUSH_CRON_MORNING|NOON|NIGHT."
+              : ""
+    });
+  }
 });

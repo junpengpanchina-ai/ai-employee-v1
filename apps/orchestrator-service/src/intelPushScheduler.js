@@ -15,7 +15,7 @@ function envFlagFalse(name) {
   );
 }
 
-/** 与 HTTP push / notify 相同的最低配置（不设则无法推 Telegram） */
+/** 与 HTTP push / notify 相同的最低配置 */
 function intelPushDepsConfigured() {
   const chat = String(process.env.TELEGRAM_BOSS_CHAT_ID ?? "").trim();
   const botBase = String(process.env.BOT_SERVICE_BASE_URL ?? "").trim();
@@ -27,10 +27,45 @@ function intelPushDepsConfigured() {
   return Boolean(chat && botBase && secret);
 }
 
+function pushEnvSnapshot() {
+  return {
+    TELEGRAM_BOSS_CHAT_ID: Boolean(
+      String(process.env.TELEGRAM_BOSS_CHAT_ID ?? "").trim()
+    ),
+    BOT_SERVICE_BASE_URL: Boolean(
+      String(process.env.BOT_SERVICE_BASE_URL ?? "").trim()
+    ),
+    has_BOT_INTERNAL_SECRET: Boolean(
+      String(process.env.BOT_INTERNAL_SECRET ?? "").trim()
+    ),
+    has_ORCHESTRATOR_INTERNAL_SECRET: Boolean(
+      String(process.env.ORCHESTRATOR_INTERNAL_SECRET ?? "").trim()
+    )
+  };
+}
+
 /**
- * 是否启用进程内定时推送。
- * - 未设置：已配齐 TELEGRAM_BOSS_CHAT_ID + BOT_SERVICE_BASE_URL + 内部密钥 → **自动开**（方式 A）
- * - 显式 `true` / `false` 等：按字面优先
+ * 未设置 INTEL_AUTO_PUSH_TZ / TZ 时默认 **Asia/Shanghai**，避免 Railway（UTC）上 8 点变成北京时间 16 点。
+ */
+function resolveCronTimezone() {
+  const cand = String(
+    process.env.INTEL_AUTO_PUSH_TZ || process.env.TZ || "Asia/Shanghai"
+  ).trim();
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: cand });
+    return cand;
+  } catch {
+    console.warn(
+      "[intel-auto-push] invalid timezone, using UTC:",
+      cand
+    );
+    return "UTC";
+  }
+}
+
+/**
+ * - 未设置 INTEL_AUTO_PUSH_ENABLED：配齐推送 env → 自动开
+ * - 显式 false → 关；显式 true → 开（仍要求配齐 env 才注册）
  */
 function isIntelAutoPushEnabled() {
   const raw = String(process.env.INTEL_AUTO_PUSH_ENABLED ?? "").trim();
@@ -39,30 +74,44 @@ function isIntelAutoPushEnabled() {
   }
   if (envFlagFalse("INTEL_AUTO_PUSH_ENABLED")) return false;
   if (envFlagTrue("INTEL_AUTO_PUSH_ENABLED")) return true;
-  return false;
+  console.warn(
+    "[intel-auto-push] unknown INTEL_AUTO_PUSH_ENABLED, falling back to auto:",
+    raw
+  );
+  return intelPushDepsConfigured();
 }
 
 /**
- * 进程内定时推送（不依赖 Railway / 外部 Cron）。
- * 见 `isIntelAutoPushEnabled()`；与 `POST /internal/intel/push` 同源。
+ * 进程内 8/12/21 推送；与 `POST /internal/intel/push` 同源。
+ * @returns {{ started: boolean, reason?: string, detail?: Record<string, unknown> }}
  */
 export function startIntelAutoPushScheduler() {
   if (schedulerStarted) {
-    return;
-  }
-  if (!isIntelAutoPushEnabled()) {
-    return;
-  }
-  if (!intelPushDepsConfigured()) {
-    console.warn(
-      "[intel-auto-push] enabled but TELEGRAM_BOSS_CHAT_ID / BOT_SERVICE_BASE_URL / internal secret incomplete — not starting scheduler"
-    );
-    return;
+    return { started: true, reason: "already_started" };
   }
 
-  const tz =
-    String(process.env.INTEL_AUTO_PUSH_TZ || process.env.TZ || "").trim() ||
-    undefined;
+  if (!isIntelAutoPushEnabled()) {
+    const raw = String(process.env.INTEL_AUTO_PUSH_ENABLED ?? "").trim();
+    if (raw !== "" && envFlagFalse("INTEL_AUTO_PUSH_ENABLED")) {
+      return { started: false, reason: "explicit_disabled" };
+    }
+    return {
+      started: false,
+      reason: "missing_push_env",
+      detail: pushEnvSnapshot()
+    };
+  }
+
+  if (!intelPushDepsConfigured()) {
+    return {
+      started: false,
+      reason: "missing_push_env",
+      detail: pushEnvSnapshot()
+    };
+  }
+
+  const tz = resolveCronTimezone();
+  const scheduleOpts = { timezone: tz, scheduled: true };
   const cronMorning =
     String(process.env.INTEL_AUTO_PUSH_CRON_MORNING || "0 8 * * *").trim();
   const cronNoon =
@@ -77,9 +126,7 @@ export function startIntelAutoPushScheduler() {
     { expr: cronNight, slot: /** @type {const} */ ("night") }
   ];
 
-  const scheduleOpts = tz ? { timezone: tz } : {};
   let scheduledCount = 0;
-
   for (const { expr, slot } of jobs) {
     if (!cron.validate(expr)) {
       console.error(
@@ -110,10 +157,11 @@ export function startIntelAutoPushScheduler() {
   }
 
   if (scheduledCount === 0) {
-    console.error(
-      "[intel-auto-push] enabled but no valid cron — check INTEL_AUTO_PUSH_CRON_*"
-    );
-    return;
+    return {
+      started: false,
+      reason: "invalid_cron_all",
+      detail: { cronMorning, cronNoon, cronNight }
+    };
   }
 
   schedulerStarted = true;
@@ -124,10 +172,14 @@ export function startIntelAutoPushScheduler() {
 
   console.log("[intel-auto-push] in-process scheduler ON", {
     mode,
-    timezone: tz || "(server local)",
+    timezone: tz,
     cron_morning: cronMorning,
     cron_noon: cronNoon,
     cron_night: cronNight,
-    sync_first: syncFirst
+    sync_first: syncFirst,
+    note:
+      "times follow timezone above (default Asia/Shanghai if INTEL_AUTO_PUSH_TZ unset)"
   });
+
+  return { started: true, reason: "scheduled", detail: { timezone: tz, mode } };
 }
